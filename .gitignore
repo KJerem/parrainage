@@ -1,0 +1,40 @@
+# Dépendances
+node_modules/
+
+# Builds
+.next/
+out/
+build/
+dist/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# Variables d'environnement
+.env*
+!.env.example
+
+# Client Prisma généré
+src/generated/
+
+# Service worker généré (Serwist)
+public/sw.js
+public/sw.js.map
+public/swe-worker*
+
+# Tests
+playwright-report/
+test-results/
+blob-report/
+e2e/.auth/
+
+# Copie locale des maquettes de référence
+.maquettes/
+
+# Divers
+.DS_Store
+Thumbs.db
+*.log
+.vercel
+.idea/
+.cursor/
