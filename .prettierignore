@@ -1,0 +1,12 @@
+.next/
+node_modules/
+coverage/
+dist/
+**/src/generated/
+apps/web/public/sw.js
+apps/web/public/swe-worker*
+playwright-report/
+test-results/
+package-lock.json
+**/prisma/migrations/
+*.md

@@ -1,0 +1,139 @@
+@import "tailwindcss";
+
+/*
+ * Jetons du design « Plateforme LRT — parrainage ».
+ * Palette fermée : seules les teintes de la maquette sont disponibles.
+ */
+@theme {
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  /* Encre */
+  --color-ink: #17201d;
+  --color-ink-soft: #3d4844;
+  --color-muted: #5a6662;
+  --color-side-ink: #c5cfcb;
+  --color-ink-800: #2a3531;
+
+  /* Surfaces et bordures */
+  --color-canvas: #f3f5f4;
+  --color-surface-alt: #fafbfa;
+  --color-line: #e1e6e4;
+  --color-line-soft: #eef1f0;
+  --color-line-strong: #c9d3cf;
+
+  /* Marque */
+  --color-brand-900: #123a31;
+  --color-brand-700: #1e5c4e;
+  --color-brand-600: #2b6f60;
+  --color-brand-400: #5e9586;
+  --color-brand-300: #8db8ab;
+  --color-brand-200: #cfe3dc;
+  --color-brand-100: #e3efeb;
+
+  /* Accent */
+  --color-accent-600: #d4902c;
+  --color-accent-500: #e9a23b;
+  --color-accent-100: #fcf1de;
+  --color-accent-700: #8a5a0e;
+  --color-accent-900: #4a3608;
+
+  /* Statuts */
+  --color-danger-600: #b3412e;
+  --color-danger-100: #f8e7e3;
+  --color-info-600: #2f5d9e;
+  --color-info-150: #dce4f2;
+  --color-info-100: #e6eef8;
+
+  /* Espace enfant */
+  --color-kid-canvas: #fbf7ef;
+  --color-kid-line: #eadfcb;
+  --color-kid-line-soft: #f1e8d8;
+  --color-kid-thread: #fffdf9;
+
+  /* Tailles de texte de la maquette (px) */
+  --text-11: 11px;
+  --text-12: 12px;
+  --text-13: 13px;
+  --text-14: 14px;
+  --text-15: 15px;
+  --text-16: 16px;
+  --text-17: 17px;
+  --text-18: 18px;
+  --text-19: 19px;
+  --text-20: 20px;
+  --text-22: 22px;
+  --text-24: 24px;
+  --text-26: 26px;
+  --text-28: 28px;
+  --text-30: 30px;
+  --text-32: 32px;
+  --text-36: 36px;
+  --text-44: 44px;
+
+  /* Rayons de la maquette (px) */
+  --radius-4: 4px;
+  --radius-5: 5px;
+  --radius-8: 8px;
+  --radius-9: 9px;
+  --radius-10: 10px;
+  --radius-12: 12px;
+  --radius-14: 14px;
+  --radius-16: 16px;
+  --radius-18: 18px;
+  --radius-20: 20px;
+  --radius-24: 24px;
+  --radius-28: 28px;
+  --radius-32: 32px;
+
+  /* Ombres : la maquette est plate, seuls dialogues et tiroirs en portent une */
+  --shadow-dialog: 0 12px 40px rgb(23 32 29 / 0.18);
+  --shadow-drawer: 4px 0 24px rgb(23 32 29 / 0.2);
+
+  /* Conteneurs */
+  --container-parrain: 1280px;
+  --container-kid: 1160px;
+  --container-form: 400px;
+  --container-success: 640px;
+}
+
+@theme inline {
+  --font-sans: var(--font-figtree), system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    /* La maquette n'a pas de reset : interligne « normal » par défaut. */
+    line-height: normal;
+    color-scheme: light;
+  }
+
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+  }
+
+  a {
+    color: var(--color-brand-700);
+  }
+
+  a:hover {
+    color: var(--color-brand-900);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand-700);
+    outline-offset: 2px;
+  }
+
+  /* Évite le zoom automatique d'iOS sur les champs. */
+  @media (max-width: 767px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px;
+    }
+  }
+}
