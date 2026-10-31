@@ -93,8 +93,9 @@
   --shadow-drawer: 4px 0 24px rgb(23 32 29 / 0.2);
 
   /* Conteneurs */
-  --container-parrain: 1280px;
-  --container-kid: 1160px;
+  /* Maquette sans reset : max-width hors padding. 1280 + 2 × 24 = 1328 en border-box. */
+  --container-parrain: 1328px;
+  --container-kid: 1208px; /* 1160 + 2 × 24 */
   --container-form: 400px;
   --container-success: 640px;
 }

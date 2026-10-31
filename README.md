@@ -51,6 +51,7 @@ npm run dev        # API (port 4000) et web (port 3000)
 | `npm run verify` | lint, vérification des types, tests et builds des deux applications |
 | `npm run test` | tests unitaires (Vitest) |
 | `npm run test:e2e -w @parrainage/api` | tests e2e de l'API (services Docker démarrés) |
+| `npm run test:e2e -w @parrainage/web` | tests Playwright du web : débordement horizontal (360 → 1440 px) et accessibilité (axe) |
 | `npm run format` | formatage (Prettier) |
 | `npm run db:migrate` / `db:seed` / `db:reset` / `db:studio` | base de données (Prisma) |
 
