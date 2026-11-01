@@ -9,9 +9,263 @@ datasource db {
   provider = "postgresql"
 }
 
+// Conventions : montants en centimes (Int), dates civiles en @db.Date (minuit UTC),
+// teintes d'avatar validées par `avatarToneSchema` (@parrainage/contracts).
+
 /// Réglages applicatifs modifiables par le bureau (taux, mentions du reçu, numérotation…).
 model AppSetting {
   key       String   @id
   value     Json
   updatedAt DateTime @updatedAt
+}
+
+// ─── Better Auth ──────────────────────────────────────────────────────────────
+// Modèles générés par `npx auth@1.7.14 generate` (la CLI réécrit ce fichier : fusionner à la main).
+// Les relations vers les modèles métier sont ajoutées en fin de modèle User.
+
+model User {
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  role          String?
+  banned        Boolean?  @default(false)
+  banReason     String?
+  banExpires    DateTime?
+  sessions      Session[]
+  accounts      Account[]
+
+  // Relations métier (hors Better Auth).
+  relais          Relais?
+  parrainProfile  ParrainProfile?
+  createdChildren Child[]         @relation("ChildCreatedBy")
+  auditLogs       AuditLog[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id             String   @id
+  expiresAt      DateTime
+  token          String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  ipAddress      String?
+  userAgent      String?
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  impersonatedBy String?
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+/// Compteurs de tentatives : Better Auth (clés « ip|chemin ») et limites par e-mail (« email:… »).
+model RateLimit {
+  id          String @id
+  key         String
+  count       Int
+  lastRequest BigInt
+
+  @@unique([key])
+  @@map("rateLimit")
+}
+
+// ─── Réseau ───────────────────────────────────────────────────────────────────
+
+enum Gender {
+  F
+  M
+}
+
+enum SchoolLevel {
+  PRIMAIRE
+  COLLEGE
+  LYCEE
+}
+
+enum ChildFileStatus {
+  DRAFT
+  SUBMITTED
+  VALIDATED
+  ARCHIVED
+}
+
+/// Relais local de l'association (un compte de rôle « relais »).
+model Relais {
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  user           User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  displayName    String
+  city           String
+  district       String
+  country        String    @default("Togo")
+  timeZone       String    @default("Africa/Lome")
+  lastActivityAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  schools  School[]
+  children Child[]
+}
+
+model School {
+  id        String      @id @default(cuid())
+  relaisId  String
+  relais    Relais      @relation(fields: [relaisId], references: [id], onDelete: Restrict)
+  shortName String
+  fullName  String
+  city      String
+  level     SchoolLevel
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  children Child[]
+
+  @@unique([relaisId, shortName])
+}
+
+/// Profil d'un parrain ou d'une marraine (un compte de rôle « parrain »).
+model ParrainProfile {
+  id           String    @id @default(cuid())
+  userId       String    @unique
+  user         User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  firstName    String
+  /// Initiale du nom, sans point (« M » pour « Claire M. »).
+  lastInitial  String
+  displayName  String
+  gender       Gender
+  city         String
+  country      String    @default("France")
+  timeZone     String    @default("Europe/Paris")
+  /// Adresse postale, pour le reçu fiscal.
+  addressLine  String?
+  postalCode   String?
+  wishes       String?
+  avatarTone   String    @default("info")
+  /// Jour du prélèvement mensuel simulé (1 à 28).
+  debitDay     Int       @default(5)
+  joinedAt     DateTime  @default(now())
+  lastActiveAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  sponsorships Sponsorship[]
+}
+
+model Child {
+  id                 String          @id @default(cuid())
+  relaisId           String
+  relais             Relais          @relation(fields: [relaisId], references: [id], onDelete: Restrict)
+  schoolId           String?
+  school             School?         @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  firstName          String
+  lastInitial        String
+  gender             Gender
+  /// Jamais transmise au parrain (seul l'âge est affiché).
+  birthDate          DateTime        @db.Date
+  district           String
+  className          String
+  /// Année scolaire, « 2026-2027 ».
+  schoolYear         String
+  teacherName        String?
+  avatarTone         String          @default("amber")
+  guardianName       String
+  /// Jamais transmis au parrain.
+  guardianPhone      String
+  consentSponsorship Boolean         @default(false)
+  consentMedia       Boolean         @default(false)
+  fileStatus         ChildFileStatus @default(DRAFT)
+  createdById        String
+  createdBy          User            @relation("ChildCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  submittedAt        DateTime?
+  validatedAt        DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  sponsorships Sponsorship[]
+
+  @@index([relaisId, fileStatus])
+  @@index([schoolId])
+}
+
+// ─── Binômes ──────────────────────────────────────────────────────────────────
+
+enum SponsorshipStatus {
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+/// Binôme parrain ↔ enfant. Le co-parrainage est permis ; la santé du binôme est calculée.
+model Sponsorship {
+  id                 String            @id @default(cuid())
+  childId            String
+  child              Child             @relation(fields: [childId], references: [id], onDelete: Restrict)
+  parrainId          String
+  parrain            ParrainProfile    @relation(fields: [parrainId], references: [id], onDelete: Restrict)
+  status             SponsorshipStatus @default(ACTIVE)
+  monthlyAmountCents Int
+  startDate          DateTime          @db.Date
+  endDate            DateTime?         @db.Date
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([childId, status])
+  @@index([parrainId, status])
+}
+
+// ─── Transverse ───────────────────────────────────────────────────────────────
+
+/// Journal d'audit (liste fermée d'actions, voir le plan §8).
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?
+  actor       User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  action      String
+  entityType  String
+  entityId    String
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorUserId])
+  @@index([createdAt])
 }

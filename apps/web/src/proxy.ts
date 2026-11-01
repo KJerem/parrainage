@@ -1,0 +1,22 @@
+import { getSessionCookie } from "better-auth/cookies";
+import { NextResponse, type NextRequest } from "next/server";
+import { isProtectedPath, loginPath } from "@/lib/auth-paths";
+
+/**
+ * Redirection optimiste : un espace adulte sans cookie de session renvoie vers la connexion.
+ * La présence du cookie suffit ici ; les layouts vérifient la session et le rôle auprès de l'API.
+ */
+export function proxy(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
+  if (!isProtectedPath(pathname) || getSessionCookie(request)) {
+    return NextResponse.next();
+  }
+  return NextResponse.redirect(new URL(loginPath(`${pathname}${search}`), request.url));
+}
+
+export const config = {
+  // Ni l'API (réécrite vers NestJS), ni les fichiers statiques, ni le guide de style.
+  matcher: [
+    "/((?!api(?:/|$)|_next/static|_next/image|favicon\\.ico|sw\\.js|manifest\\.webmanifest|icons/|dev/ui).*)",
+  ],
+};

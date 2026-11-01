@@ -15,7 +15,10 @@ export type NavItem = {
 /** Lien du menu de compte, ou action envoyée en POST (déconnexion). */
 export type MenuItem = { label: string; href: string } | { label: string; action: string };
 
-export const logoutItem: MenuItem = { label: "Se déconnecter", action: "/api/auth/logout" };
+/** Formulaire POST traité par src/app/deconnexion/route.ts : fonctionne sans JavaScript. */
+export const LOGOUT_ACTION = "/deconnexion";
+
+export const logoutItem: MenuItem = { label: "Se déconnecter", action: LOGOUT_ACTION };
 
 export const parrainNav = [
   { key: "filleuls", href: "/parrain", label: "Mes filleuls", exact: true },

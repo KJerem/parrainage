@@ -10,7 +10,8 @@
     "node": ">=22.12"
   },
   "scripts": {
-    "dev": "concurrently -n api,web -c green,blue \"npm run dev -w @parrainage/api\" \"npm run dev -w @parrainage/web\"",
+    "postinstall": "npm run build -w @parrainage/contracts",
+    "dev": "npm run build -w @parrainage/contracts && concurrently -n contracts,api,web -c gray,green,blue \"npm run dev -w @parrainage/contracts\" \"npm run dev -w @parrainage/api\" \"npm run dev -w @parrainage/web\"",
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",

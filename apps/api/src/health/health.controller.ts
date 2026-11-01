@@ -1,7 +1,10 @@
 import { Controller, Get, Header, Query, Res } from "@nestjs/common";
+import { AllowAnonymous } from "@thallesp/nestjs-better-auth";
 import type { Response } from "express";
 import { HealthService } from "./health.service.js";
 
+// Sonde publique : supervision et détection du mode hors ligne.
+@AllowAnonymous()
 @Controller("health")
 export class HealthController {
   constructor(private readonly health: HealthService) {}

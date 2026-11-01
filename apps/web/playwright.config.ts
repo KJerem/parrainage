@@ -1,8 +1,12 @@
+import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
-// E2E_PORT permet de contourner un port 3100 déjà occupé sur le poste.
+// Ports dédiés (3100 et 4100) : les tests tournent à côté de `npm run dev` (3000 et 4000).
+// E2E_PORT et E2E_API_PORT permettent de contourner un port déjà occupé sur le poste.
 const port = Number(process.env.E2E_PORT ?? 3100);
+const apiPort = Number(process.env.E2E_API_PORT ?? 4100);
 const baseURL = `http://localhost:${port}`;
+const apiURL = `http://localhost:${apiPort}`;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -11,18 +15,36 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   workers: 1,
   reporter: "list",
+  // Remet la base de développement dans l'état du seed (voir e2e/global-setup.ts).
+  globalSetup: "./e2e/global-setup.ts",
   use: {
     baseURL,
     trace: "retain-on-failure",
   },
-  // Build de production servi sur un port dédié ; SHOW_DEV_UI ouvre /dev/ui aux tests.
-  webServer: {
-    command: `npm run build && npx next start -p ${port}`,
-    url: baseURL,
-    env: { SHOW_DEV_UI: "1" },
-    reuseExistingServer: !process.env.CI,
-    timeout: 180_000,
-  },
+  // Builds de production des deux serveurs. Le web est construit pour l'origine des tests :
+  // l'API la déclare de confiance (APP_URL) et bâtit les liens des e-mails à partir d'elle.
+  webServer: [
+    {
+      name: "api",
+      // Lancée depuis apps/api pour lire apps/api/.env (base, SMTP, secret).
+      command: "npm run build -w @parrainage/api && node dist/main.js",
+      cwd: path.join(__dirname, "..", "api"),
+      url: `${apiURL}/api/health?light`,
+      env: { PORT: String(apiPort), APP_URL: baseURL },
+      // Une API déjà lancée sur ce port ferait confiance à une autre origine : jamais réutilisée.
+      reuseExistingServer: false,
+      timeout: 180_000,
+    },
+    {
+      name: "web",
+      command: `npm run build && npx next start -p ${port}`,
+      url: baseURL,
+      // SHOW_DEV_UI ouvre /dev/ui aux tests.
+      env: { SHOW_DEV_UI: "1", API_INTERNAL_URL: apiURL, NEXT_PUBLIC_APP_URL: baseURL },
+      reuseExistingServer: !process.env.CI,
+      timeout: 180_000,
+    },
+  ],
   projects: [
     {
       name: "desktop-1440",
