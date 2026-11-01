@@ -1,5 +1,6 @@
 import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
+import { E2E_APP_NOW, E2E_SEED_TODAY } from "./e2e/clock";
 
 // Ports dédiés (3100 et 4100) : les tests tournent à côté de `npm run dev` (3000 et 4000).
 // E2E_PORT et E2E_API_PORT permettent de contourner un port déjà occupé sur le poste.
@@ -15,8 +16,10 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   workers: 1,
   reporter: "list",
-  // Remet la base de développement dans l'état du seed (voir e2e/global-setup.ts).
+  // Remet la base de développement dans l'état du seed, calé sur le jour du design
+  // (SEED_TODAY = E2E_SEED_TODAY, voir e2e/global-setup.ts et e2e/clock.ts).
   globalSetup: "./e2e/global-setup.ts",
+  metadata: { appNow: E2E_APP_NOW, seedToday: E2E_SEED_TODAY },
   use: {
     baseURL,
     trace: "retain-on-failure",
@@ -30,7 +33,8 @@ export default defineConfig({
       command: "npm run build -w @parrainage/api && node dist/main.js",
       cwd: path.join(__dirname, "..", "api"),
       url: `${apiURL}/api/health?light`,
-      env: { PORT: String(apiPort), APP_URL: baseURL },
+      // APP_NOW : horloge figée sur le jour du design, le même que celui du seed (e2e/clock.ts).
+      env: { PORT: String(apiPort), APP_URL: baseURL, APP_NOW: E2E_APP_NOW },
       // Une API déjà lancée sur ce port ferait confiance à une autre origine : jamais réutilisée.
       reuseExistingServer: false,
       timeout: 180_000,
@@ -39,8 +43,14 @@ export default defineConfig({
       name: "web",
       command: `npm run build && npx next start -p ${port}`,
       url: baseURL,
-      // SHOW_DEV_UI ouvre /dev/ui aux tests.
-      env: { SHOW_DEV_UI: "1", API_INTERNAL_URL: apiURL, NEXT_PUBLIC_APP_URL: baseURL },
+      // SHOW_DEV_UI ouvre /dev/ui aux tests ; FEED_PAGE_SIZE=1 fait paginer « Tout le fil »
+      // avec les quelques éléments du seed.
+      env: {
+        SHOW_DEV_UI: "1",
+        FEED_PAGE_SIZE: "1",
+        API_INTERNAL_URL: apiURL,
+        NEXT_PUBLIC_APP_URL: baseURL,
+      },
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,
     },

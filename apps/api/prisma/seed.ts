@@ -1,13 +1,22 @@
 // Seed de démonstration, idempotent : `npm run db:seed` (ou `db:reset`). Réservé au développement.
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { hashPassword } from "better-auth/crypto";
+import { getEnv } from "../src/config/env.js";
+import type { Prisma } from "../src/generated/prisma/client.js";
 import { prisma } from "../src/prisma/client.js";
+import { createS3Client } from "../src/storage/s3-client.js";
+import { buildSeedContent, type SeedContent, type SeedUpload } from "./seed/content.js";
 import { buildSeedData, type SeedUser } from "./seed/data.js";
 import { seedToday } from "./seed/dates.js";
 
-const today = seedToday(process.env.SEED_TODAY);
+// Jour de référence : SEED_TODAY, sinon le jour de l'horloge figée APP_NOW, sinon aujourd'hui.
+const today = seedToday(process.env.SEED_TODAY || process.env.APP_NOW);
 const password = process.env.SEED_DEFAULT_PASSWORD ?? "motdepasse";
 // Un seul hachage scrypt (lent en JavaScript pur), partagé par tous les comptes de démonstration.
 let passwordHash: Promise<string> | undefined;
+
+/** Préfixe des identifiants créés par le seed : seules ces lignes sont réécrites ou supprimées. */
+const SEED_PREFIX = "seed-";
 
 /** Compte Better Auth : utilisateur + identifiant « credential » (mot de passe haché en scrypt). */
 async function upsertUser(user: SeedUser): Promise<void> {
@@ -31,6 +40,130 @@ async function upsertUser(user: SeedUser): Promise<void> {
       password: hash,
     },
   });
+}
+
+/** Requêtes groupées en transactions (bien plus rapide qu'une requête à la fois). */
+async function inBatches<T>(
+  items: readonly T[],
+  run: (item: T) => Prisma.PrismaPromise<unknown>,
+): Promise<void> {
+  const size = 200;
+  for (let start = 0; start < items.length; start += size) {
+    await prisma.$transaction(items.slice(start, start + size).map(run));
+  }
+}
+
+/**
+ * Dépose les fichiers réels (bulletin PDF) dans le stockage. Stockage indisponible : un
+ * avertissement, et les médias concernés restent des emplacements réservés.
+ */
+async function uploadFiles(uploads: readonly SeedUpload[]): Promise<Set<string>> {
+  const env = getEnv();
+  const client = createS3Client({
+    region: env.S3_REGION,
+    accessKey: env.S3_ACCESS_KEY,
+    secretKey: env.S3_SECRET_KEY,
+    endpoint: env.S3_ENDPOINT,
+  });
+  const uploaded = new Set<string>();
+  try {
+    for (const upload of uploads) {
+      await client.send(
+        new PutObjectCommand({
+          Bucket: env.S3_BUCKET,
+          Key: upload.storageKey,
+          Body: upload.body,
+          ContentType: upload.contentType,
+          ContentLength: upload.body.length,
+        }),
+        { abortSignal: AbortSignal.timeout(5000) },
+      );
+      uploaded.add(upload.mediaId);
+    }
+  } catch (error) {
+    console.warn(
+      `Stockage indisponible (${error instanceof Error ? error.message : String(error)}) : ` +
+        "le bulletin PDF reste un emplacement réservé (PLACEHOLDER). Relancez le seed une fois " +
+        "RustFS démarré (npm run db:up).",
+    );
+  } finally {
+    client.destroy();
+  }
+  return uploaded;
+}
+
+/** Supprime les lignes du seed qui n'existent plus dans les données (autre SEED_TODAY…). */
+const stale = (ids: readonly string[]) => ({
+  AND: [{ id: { startsWith: SEED_PREFIX } }, { id: { notIn: [...ids] } }],
+});
+
+async function seedContent(content: SeedContent): Promise<{ uploaded: number }> {
+  const uploaded = await uploadFiles(content.uploads);
+  const media = content.media.map((m) =>
+    m.status === "READY" && !uploaded.has(m.id)
+      ? { ...m, status: "PLACEHOLDER" as const, storageKey: null, sizeBytes: null }
+      : m,
+  );
+
+  await prisma.media.deleteMany({ where: stale(media.map((m) => m.id)) });
+  await prisma.message.deleteMany({ where: stale(content.messages.map((m) => m.id)) });
+  await prisma.newsPost.deleteMany({ where: stale(content.news.map((n) => n.id)) });
+  await prisma.payment.deleteMany({ where: stale(content.payments.map((p) => p.id)) });
+  await prisma.schoolResult.deleteMany({ where: stale(content.results.map((r) => r.id)) });
+  await prisma.academicPeriod.deleteMany({
+    where: { ...stale(content.periods.map((p) => p.id)), results: { none: {} } },
+  });
+
+  await inBatches(content.periods, ({ id, ...fields }) =>
+    prisma.academicPeriod.upsert({ where: { id }, update: fields, create: { id, ...fields } }),
+  );
+  await inBatches(content.results, ({ id, ...fields }) =>
+    prisma.schoolResult.upsert({ where: { id }, update: fields, create: { id, ...fields } }),
+  );
+  await inBatches(content.news, ({ id, childIds: _childIds, ...fields }) =>
+    prisma.newsPost.upsert({ where: { id }, update: fields, create: { id, ...fields } }),
+  );
+  await prisma.newsPostChild.deleteMany({
+    where: {
+      OR: content.news.map((n) => ({ newsPostId: n.id, childId: { notIn: n.childIds } })),
+    },
+  });
+  await inBatches(
+    content.news.flatMap((n) => n.childIds.map((childId) => ({ newsPostId: n.id, childId }))),
+    (link) =>
+      prisma.newsPostChild.upsert({
+        where: { newsPostId_childId: link },
+        update: {},
+        create: link,
+      }),
+  );
+  await inBatches(content.conversations, ({ id, participants: _participants, ...fields }) =>
+    prisma.conversation.upsert({ where: { id }, update: fields, create: { id, ...fields } }),
+  );
+  await inBatches(
+    content.conversations.flatMap((c) =>
+      c.participants.map((p) => ({ ...p, conversationId: c.id })),
+    ),
+    ({ id, ...fields }) =>
+      prisma.conversationParticipant.upsert({
+        where: { id },
+        update: fields,
+        create: { id, ...fields },
+      }),
+  );
+  await inBatches(content.messages, ({ id, ...fields }) =>
+    prisma.message.upsert({ where: { id }, update: fields, create: { id, ...fields } }),
+  );
+  await inBatches(media, ({ id, ...fields }) =>
+    prisma.media.upsert({ where: { id }, update: fields, create: { id, ...fields } }),
+  );
+  await inBatches(content.childPhotos, ({ childId, mediaId }) =>
+    prisma.child.update({ where: { id: childId }, data: { photoMediaId: mediaId } }),
+  );
+  await inBatches(content.payments, ({ id, ...fields }) =>
+    prisma.payment.upsert({ where: { id }, update: fields, create: { id, ...fields } }),
+  );
+  return { uploaded: uploaded.size };
 }
 
 async function main() {
@@ -73,10 +206,13 @@ async function main() {
     await prisma.sponsorship.upsert({ where: { id }, update: fields, create: sponsorship });
   }
 
+  const content = buildSeedContent(today, data);
+  const { uploaded } = await seedContent(content);
+
   await prisma.appSetting.upsert({
     where: { key: "seed.version" },
-    update: { value: 1 },
-    create: { key: "seed.version", value: 1 },
+    update: { value: 2 },
+    create: { key: "seed.version", value: 2 },
   });
 
   const activeChildIds = new Set(
@@ -97,6 +233,12 @@ async function main() {
   console.log(
     `  ${data.sponsorships.length} binômes actifs, ` +
       `${data.children.length - activeChildIds.size} enfants en attente de parrain`,
+  );
+  console.log(
+    `  ${content.news.length} nouvelles, ${content.messages.length} messages, ` +
+      `${content.conversations.length} conversations, ${content.results.length} résultats, ` +
+      `${content.payments.length} versements, ${content.media.length} médias ` +
+      `(${uploaded} fichier${uploaded > 1 ? "s" : ""} déposé${uploaded > 1 ? "s" : ""})`,
   );
 }
 

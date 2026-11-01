@@ -51,13 +51,13 @@ npm run dev        # API (port 4000) et web (port 3000)
 | `npm run verify` | lint, vérification des types, tests et builds de tous les paquets (contrats, API, web) |
 | `npm run test` | tests unitaires (Vitest) |
 | `npm run test:e2e -w @parrainage/api` | tests e2e de l'API (services Docker démarrés) |
-| `npm run test:e2e -w @parrainage/web` | tests Playwright du web : authentification et rôles, débordement horizontal (360 → 1440 px) et accessibilité (axe). **Remet à zéro la base de développement** (voir ci-dessous) |
+| `npm run test:e2e -w @parrainage/web` | tests Playwright du web : authentification et rôles, espace parrain, débordement horizontal (360 → 1440 px) et accessibilité (axe). **Remet à zéro la base de développement** (voir ci-dessous) |
 | `npm run format` | formatage (Prettier) |
 | `npm run db:migrate` / `db:seed` / `db:reset` / `db:studio` | base de données (Prisma) |
 
 ## Comptes de démonstration
 
-Créés par `npm run db:reset` (ou `npm run db:seed`, idempotent). Mot de passe commun : `motdepasse` (variable `SEED_DEFAULT_PASSWORD`, développement uniquement). Les dates du seed partent de `SEED_TODAY` (AAAA-MM-JJ, aujourd'hui par défaut).
+Créés par `npm run db:reset` (ou `npm run db:seed`, idempotent). Mot de passe commun : `motdepasse` (variable `SEED_DEFAULT_PASSWORD`, développement uniquement). Les dates du seed partent de `SEED_TODAY` (AAAA-MM-JJ, voir l'horloge de démonstration ci-dessous).
 
 | Compte | Rôle |
 |---|---|
@@ -67,6 +67,10 @@ Créés par `npm run db:reset` (ou `npm run db:seed`, idempotent). Mot de passe 
 | `bureau@exemple.fr` | bureau |
 
 Les liens de connexion et de réinitialisation du mot de passe arrivent dans Mailpit (http://localhost:8025).
+
+Le seed crée aussi les contenus du design : nouvelles des relais, échanges Claire ↔ Aïcha, résultats scolaires (Aïcha : 11,8 puis 13,4 / 20), versements simulés depuis janvier 2024 et un vrai bulletin PDF déposé dans le stockage (sans stockage démarré, il reste un emplacement réservé). Les autres médias sont des emplacements réservés (`PLACEHOLDER`).
+
+**Horloge de démonstration.** L'API calcule ses dates à partir d'`APP_NOW` (instant ISO 8601, dans `apps/api/.env`) quand il est défini, sinon de l'heure réelle ; le seed part de `SEED_TODAY`, sinon du jour d'`APP_NOW`, sinon d'aujourd'hui. Avec `APP_NOW=2026-10-31T10:00:00Z` puis `npm run db:seed`, l'espace parrain reproduit la maquette.
 
 ## Authentification
 
@@ -83,6 +87,7 @@ Les liens de connexion et de réinitialisation du mot de passe arrivent dans Mai
 
 - Par défaut (`E2E_DB=seed`), la base de développement n'est **pas effacée** : les migrations en attente sont appliquées (`db:deploy`) puis le seed est rejoué (idempotent : comptes et mots de passe de démonstration rétablis, sessions et compteurs de tentatives conservés). Relancer la suite moins de 5 minutes plus tard peut donc atteindre la limite d'envoi de liens magiques.
 - `E2E_DB=reset` efface d'abord la base (`npm run db:reset`) pour repartir de zéro.
+- Horloge figée sur le jour du design (`apps/web/e2e/clock.ts`) : l'API de test démarre avec `APP_NOW=2026-10-31T10:00:00Z` et le seed est rejoué avec `SEED_TODAY=2026-10-31`. Après la suite, les dates de la base de développement partent donc du 31 octobre 2026 ; `npm run db:seed` les recale sur aujourd'hui.
 - `E2E_PORT` et `E2E_API_PORT` changent les ports si 3100 ou 4100 sont pris.
 - Le build du web est construit pour l'origine des tests (`NEXT_PUBLIC_APP_URL=http://localhost:3100`) : relancez `npm run build` avant un `npm run start` sur le port 3000.
 

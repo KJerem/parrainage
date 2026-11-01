@@ -1,0 +1,115 @@
+import { describe, expect, it } from "vitest";
+import {
+  formatAge,
+  formatAverage,
+  formatDayMonth,
+  formatDuration,
+  formatEuros,
+  formatLongDate,
+  formatMonthYear,
+  formatPeriodKey,
+  formatRank,
+  formatRelativeDay,
+} from "./format";
+
+const NBSP = " ";
+const NNBSP = " ";
+
+describe("formatEuros", () => {
+  it("affiche les euros ronds sans centimes", () => {
+    expect(formatEuros(2500)).toBe(`25${NBSP}€`);
+    expect(formatEuros(54000)).toBe(`540${NBSP}€`);
+    expect(formatEuros(0)).toBe(`0${NBSP}€`);
+  });
+
+  it("garde deux décimales dès qu'il y a des centimes", () => {
+    expect(formatEuros(35640)).toBe(`356,40${NBSP}€`);
+    expect(formatEuros(5)).toBe(`0,05${NBSP}€`);
+  });
+
+  it("sépare les milliers par une espace fine insécable", () => {
+    expect(formatEuros(154000)).toBe(`1${NNBSP}540${NBSP}€`);
+  });
+});
+
+describe("formatAverage et formatRank", () => {
+  it("convertit les centièmes en note sur 20", () => {
+    expect(formatAverage(1340)).toBe("13,4 / 20");
+    expect(formatAverage(1180)).toBe("11,8 / 20");
+    expect(formatAverage(1200)).toBe("12,0 / 20");
+    expect(formatAverage(1345)).toBe("13,45 / 20");
+  });
+
+  it("affiche le rang avec ou sans effectif", () => {
+    expect(formatRank(5, 48)).toBe("5 / 48");
+    expect(formatRank(1, null)).toBe("1er");
+    expect(formatRank(3, null)).toBe("3e");
+  });
+});
+
+describe("formatAge et formatDuration", () => {
+  it("accorde « an » au pluriel à partir de 2", () => {
+    expect(formatAge(12)).toBe("12 ans");
+    expect(formatAge(1)).toBe("1 an");
+    expect(formatAge(0)).toBe("0 an");
+  });
+
+  it("formate une durée en minutes et secondes", () => {
+    expect(formatDuration(42)).toBe("0:42");
+    expect(formatDuration(65)).toBe("1:05");
+    expect(formatDuration(600)).toBe("10:00");
+    expect(formatDuration(3723)).toBe("1:02:03");
+    expect(formatDuration(-3)).toBe("0:00");
+  });
+});
+
+describe("mois et dates", () => {
+  it("donne le mois et l'année d'une date civile", () => {
+    expect(formatMonthYear("2023-03-01")).toBe("mars 2023");
+    expect(formatMonthYear("2025-09-01")).toBe("septembre 2025");
+    expect(formatPeriodKey("2026-10")).toBe("Octobre 2026");
+    expect(formatPeriodKey("2026-08")).toBe("Août 2026");
+  });
+
+  it("écrit le jour et le mois à l'heure de Paris", () => {
+    expect(formatDayMonth("2026-10-12T09:00:00Z")).toBe("12 octobre");
+    expect(formatDayMonth("2026-09-02T15:00:00Z", { month: "short" })).toBe("2 sept.");
+    // 23 h 30 UTC le 31 octobre : déjà le 1er novembre à Paris.
+    expect(formatDayMonth("2026-10-31T23:30:00Z")).toBe("1er novembre");
+    expect(formatLongDate("2026-10-30T14:30:00Z")).toBe("30 octobre 2026");
+    expect(formatLongDate("2026-05-01T08:00:00Z")).toBe("1er mai 2026");
+  });
+});
+
+describe("formatRelativeDay", () => {
+  const now = "2026-10-31T10:00:00Z";
+
+  it("compte les jours civils à l'heure de Paris", () => {
+    expect(formatRelativeDay("2026-10-31T06:00:00Z", now)).toBe("Aujourd'hui");
+    expect(formatRelativeDay("2026-10-30T15:00:00Z", now)).toBe("Hier");
+    // 23 h 30 UTC la veille : déjà le 31 à Paris.
+    expect(formatRelativeDay("2026-10-30T23:30:00Z", now)).toBe("Aujourd'hui");
+    expect(formatRelativeDay("2026-10-29T08:00:00Z", now)).toBe("il y a 2 j");
+    expect(formatRelativeDay("2026-10-25T08:00:00Z", now)).toBe("il y a 6 j");
+  });
+
+  it("passe à la date au-delà de 6 jours", () => {
+    expect(formatRelativeDay("2026-10-24T08:00:00Z", now)).toBe("24 octobre");
+    expect(formatRelativeDay("2026-10-12T09:00:00Z", now)).toBe("12 octobre");
+    expect(formatRelativeDay("2026-09-02T15:00:00Z", now, { month: "short" })).toBe("2 sept.");
+  });
+
+  it("ajoute l'année quand elle diffère de celle de référence", () => {
+    expect(formatRelativeDay("2025-12-20T09:00:00Z", now)).toBe("20 décembre 2025");
+    expect(formatRelativeDay("2025-09-05T09:00:00Z", now, { month: "short" })).toBe("5 sept. 2025");
+  });
+
+  it("respecte un seuil personnalisé et les dates à venir", () => {
+    expect(formatRelativeDay("2026-10-19T08:00:00Z", now, { maxDays: 30 })).toBe("il y a 12 j");
+    expect(formatRelativeDay("2026-11-05T08:00:00Z", now)).toBe("5 novembre");
+  });
+
+  it("accepte des objets Date", () => {
+    expect(formatRelativeDay(new Date("2026-10-30T15:00:00Z"), new Date(now))).toBe("Hier");
+  });
+});

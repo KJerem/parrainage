@@ -23,6 +23,11 @@ export const envSchema = z
     SMTP_HOST: z.string().default("localhost"),
     SMTP_PORT: z.coerce.number().int().default(1025),
     MAIL_FROM: z.string().default("Parrainage LRT <no-reply@parrainage.local>"),
+    /** Horloge figée (démo, e2e) : « 2026-10-31T10:00:00Z ». Vide : heure réelle. */
+    APP_NOW: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.iso.datetime({ offset: true }).optional(),
+    ),
   })
   .refine(
     (env) =>

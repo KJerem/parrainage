@@ -39,10 +39,16 @@ model User {
   accounts      Account[]
 
   // Relations métier (hors Better Auth).
-  relais          Relais?
-  parrainProfile  ParrainProfile?
-  createdChildren Child[]         @relation("ChildCreatedBy")
-  auditLogs       AuditLog[]
+  relais           Relais?
+  parrainProfile   ParrainProfile?
+  createdChildren  Child[]                   @relation("ChildCreatedBy")
+  auditLogs        AuditLog[]
+  uploadedMedia    Media[]                   @relation("MediaUploadedBy")
+  newsPosts        NewsPost[]                @relation("NewsPostAuthor")
+  conversations    ConversationParticipant[]
+  messages         Message[]                 @relation("MessageAuthor")
+  reviewedMessages Message[]                 @relation("MessageReviewer")
+  enteredResults   SchoolResult[]            @relation("SchoolResultEnteredBy")
 
   @@unique([email])
   @@map("user")
@@ -142,8 +148,10 @@ model Relais {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  schools  School[]
-  children Child[]
+  schools       School[]
+  children      Child[]
+  newsPosts     NewsPost[]
+  conversations Conversation[]
 }
 
 model School {
@@ -187,7 +195,9 @@ model ParrainProfile {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  sponsorships Sponsorship[]
+  sponsorships  Sponsorship[]
+  conversations Conversation[]
+  payments      Payment[]
 }
 
 model Child {
@@ -215,15 +225,25 @@ model Child {
   fileStatus         ChildFileStatus @default(DRAFT)
   createdById        String
   createdBy          User            @relation("ChildCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  /// Photo de profil (média AVATAR) : jamais montrée au parrain sans `consentMedia`.
+  photoMediaId       String?         @unique
+  photo              Media?          @relation("ChildPhoto", fields: [photoMediaId], references: [id], onDelete: SetNull)
   submittedAt        DateTime?
   validatedAt        DateTime?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 
-  sponsorships Sponsorship[]
+  sponsorships  Sponsorship[]
+  newsPosts     NewsPostChild[]
+  conversations Conversation[]
+  participants  ConversationParticipant[]
+  messages      Message[]                 @relation("MessageAuthorChild")
+  results       SchoolResult[]
+  payments      Payment[]
 
   @@index([relaisId, fileStatus])
   @@index([schoolId])
+  @@index([createdById])
 }
 
 // ─── Binômes ──────────────────────────────────────────────────────────────────
@@ -248,8 +268,369 @@ model Sponsorship {
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
+  conversation Conversation?
+  payments     Payment[]
+
   @@index([childId, status])
   @@index([parrainId, status])
+}
+
+// ─── Médias ───────────────────────────────────────────────────────────────────
+
+enum MediaKind {
+  PHOTO
+  VIDEO
+  BULLETIN
+  DOCUMENT
+  CONSENT
+  RECEIPT
+  AVATAR
+}
+
+enum MediaStatus {
+  PENDING_UPLOAD
+  READY
+  REJECTED
+  /// Média de démonstration sans fichier : affiché comme un emplacement réservé.
+  PLACEHOLDER
+}
+
+/// Fichier du stockage S3, servi uniquement par GET /api/media/:id (URL présignée de 120 s).
+model Media {
+  id               String        @id @default(cuid())
+  kind             MediaKind
+  status           MediaStatus   @default(PENDING_UPLOAD)
+  storageKey       String?       @unique
+  posterKey        String?
+  mimeType         String
+  sizeBytes        Int?
+  width            Int?
+  height           Int?
+  durationSec      Int?
+  label            String?
+  uploadedByUserId String?
+  uploadedBy       User?         @relation("MediaUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  messageId        String?
+  message          Message?      @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  newsPostId       String?
+  newsPost         NewsPost?     @relation(fields: [newsPostId], references: [id], onDelete: SetNull)
+  schoolResultId   String?
+  schoolResult     SchoolResult? @relation(fields: [schoolResultId], references: [id], onDelete: SetNull)
+  /// Ordre d'affichage parmi les médias d'un même contenu.
+  position         Int           @default(0)
+  createdAt        DateTime      @default(now())
+
+  avatarOf Child? @relation("ChildPhoto")
+
+  @@index([messageId])
+  @@index([newsPostId])
+  @@index([schoolResultId])
+  @@index([uploadedByUserId])
+  @@index([status, createdAt])
+}
+
+// ─── Contenus ─────────────────────────────────────────────────────────────────
+
+enum NewsPostType {
+  ONE_CHILD
+  SEVERAL_CHILDREN
+  RELAIS_LIFE
+}
+
+enum NewsPostStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+}
+
+/// Poste d'où un contenu a été envoyé.
+enum SentFrom {
+  WEB
+  MOBILE
+  SCHOOL_SESSION
+}
+
+/// Nouvelle publiée par un relais pour un ou plusieurs enfants (ou sur la vie du relais).
+model NewsPost {
+  id                String         @id @default(cuid())
+  relaisId          String
+  relais            Relais         @relation(fields: [relaisId], references: [id], onDelete: Restrict)
+  authorUserId      String?
+  author            User?          @relation("NewsPostAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+  type              NewsPostType
+  status            NewsPostStatus @default(DRAFT)
+  title             String
+  body              String
+  notifyParrains    Boolean        @default(true)
+  notifyBureau      Boolean        @default(false)
+  visibleToChildren Boolean        @default(false)
+  scheduledAt       DateTime?
+  publishedAt       DateTime?
+  sentFrom          SentFrom       @default(WEB)
+  idempotencyKey    String?        @unique
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  children NewsPostChild[]
+  media    Media[]
+
+  @@index([relaisId, status, publishedAt])
+  @@index([status, scheduledAt])
+}
+
+model NewsPostChild {
+  newsPostId String
+  newsPost   NewsPost @relation(fields: [newsPostId], references: [id], onDelete: Cascade)
+  childId    String
+  child      Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@id([newsPostId, childId])
+  @@index([childId])
+}
+
+enum AcademicPeriodKind {
+  T1
+  T2
+  T3
+  ANNUAL
+}
+
+model AcademicPeriod {
+  id         String             @id @default(cuid())
+  /// Année scolaire, « 2026-2027 ».
+  schoolYear String
+  kind       AcademicPeriodKind
+  /// Libellé court, placé après la classe : « 1er trimestre », « moyenne annuelle ».
+  label      String
+  /// Date limite de saisie des résultats par les relais.
+  dueDate    DateTime?          @db.Date
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  results SchoolResult[]
+
+  @@unique([schoolYear, kind])
+}
+
+enum SchoolResultStatus {
+  TO_ENTER
+  DRAFT
+  SENT
+}
+
+/// Résultats d'un enfant pour une période ; moyenne en centièmes (13,4 / 20 → 1340).
+model SchoolResult {
+  id               String             @id @default(cuid())
+  childId          String
+  child            Child              @relation(fields: [childId], references: [id], onDelete: Restrict)
+  periodId         String
+  period           AcademicPeriod     @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  /// Classe pendant la période (l'enfant change de classe chaque année).
+  className        String
+  averageX100      Int?
+  rank             Int?
+  classSize        Int?
+  appreciation     String?
+  status           SchoolResultStatus @default(TO_ENTER)
+  allowChildUpload Boolean            @default(false)
+  enteredById      String?
+  enteredBy        User?              @relation("SchoolResultEnteredBy", fields: [enteredById], references: [id], onDelete: SetNull)
+  sentAt           DateTime?
+  /// Horodatage du poste (saisie hors ligne) : une donnée plus ancienne est refusée (409).
+  clientUpdatedAt  DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  media Media[]
+
+  @@unique([childId, periodId])
+  @@index([periodId, status])
+}
+
+// ─── Messagerie ───────────────────────────────────────────────────────────────
+
+enum ConversationKind {
+  SPONSORSHIP
+  PARRAIN_RELAIS
+  RELAIS_BUREAU
+  PARRAIN_BUREAU
+  CHILD_ASSOCIATION
+}
+
+/// Une seule conversation par binôme (SPONSORSHIP) : un co-parrain ne voit pas celle de l'autre.
+model Conversation {
+  id            String           @id @default(cuid())
+  kind          ConversationKind
+  sponsorshipId String?          @unique
+  sponsorship   Sponsorship?     @relation(fields: [sponsorshipId], references: [id], onDelete: Restrict)
+  childId       String?
+  child         Child?           @relation(fields: [childId], references: [id], onDelete: Restrict)
+  relaisId      String?
+  relais        Relais?          @relation(fields: [relaisId], references: [id], onDelete: Restrict)
+  parrainId     String?
+  parrain       ParrainProfile?  @relation(fields: [parrainId], references: [id], onDelete: Restrict)
+  subject       String?
+  lastMessageAt DateTime         @default(now())
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([kind, lastMessageAt])
+  @@index([childId])
+  @@index([relaisId, lastMessageAt])
+  @@index([parrainId, lastMessageAt])
+}
+
+/// Participant : un adulte (userId) ou un enfant (childId), jamais les deux.
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  childId        String?
+  child          Child?       @relation(fields: [childId], references: [id], onDelete: Cascade)
+  lastReadAt     DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@unique([conversationId, userId])
+  @@unique([conversationId, childId])
+  @@index([userId])
+  @@index([childId])
+}
+
+enum MessageKind {
+  TEXT
+  ENCOURAGEMENT
+  CALL_REQUEST
+  CALL_SLOTS
+  SYSTEM
+  NEWSLETTER
+}
+
+enum ModerationStatus {
+  NOT_REQUIRED
+  PENDING
+  APPROVED
+  HELD
+  MASKED
+}
+
+enum DeliveryStatus {
+  SENT
+  VERIFIED
+  RECEIVED
+}
+
+/// Alertes du détecteur automatique (plan §8).
+enum AlertType {
+  PHONE
+  DIGITS
+  NUMBER_WORDS
+  EMAIL
+  URL
+  SOCIAL
+  ADDRESS
+  MONEY
+  MEETING
+}
+
+/// Signalements posés à la main par le relais ou le bureau.
+enum ManualFlag {
+  OTHER_CHILD_FACE
+  THIRD_PARTY_PHOTO
+  INAPPROPRIATE_CONTENT
+  DIRECT_CONTACT
+  OTHER
+}
+
+/// Le destinataire ne voit que les messages APPROVED ou MASKED (texte : `redactedBody`).
+model Message {
+  id               String           @id @default(cuid())
+  conversationId   String
+  conversation     Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  kind             MessageKind      @default(TEXT)
+  body             String
+  redactedBody     String?
+  moderationStatus ModerationStatus
+  deliveryStatus   DeliveryStatus   @default(SENT)
+  /// Alertes du détecteur, avec leurs positions dans le texte d'origine.
+  autoAlerts       Json             @default("[]")
+  alertTypes       AlertType[]      @default([])
+  manualFlags      ManualFlag[]     @default([])
+  reviewedById     String?
+  reviewedBy       User?            @relation("MessageReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt       DateTime?
+  autoApproved     Boolean          @default(false)
+  moderationReason String?
+  sentFrom         SentFrom         @default(WEB)
+  readAt           DateTime?
+  idempotencyKey   String?          @unique
+  authorUserId     String?
+  authorUser       User?            @relation("MessageAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+  authorChildId    String?
+  authorChild      Child?           @relation("MessageAuthorChild", fields: [authorChildId], references: [id], onDelete: SetNull)
+  createdAt        DateTime         @default(now())
+
+  media Media[]
+
+  @@index([conversationId, createdAt])
+  @@index([moderationStatus, createdAt])
+  @@index([authorUserId])
+  @@index([authorChildId, createdAt])
+  @@index([reviewedById])
+}
+
+// ─── Finances (simulées) ──────────────────────────────────────────────────────
+
+enum PaymentKind {
+  MONTHLY
+  ONE_OFF
+}
+
+enum PaymentMethod {
+  SEPA_DEBIT
+  CARD
+  TRANSFER
+  CHEQUE
+}
+
+enum PaymentStatus {
+  SCHEDULED
+  RECEIVED
+  LATE
+  FAILED
+  CANCELLED
+}
+
+/// Versement simulé. `periodKey` (AAAA-MM) n'est renseigné que pour une mensualité : un seul
+/// prélèvement par binôme et par mois ; les dons ponctuels (NULL) restent libres.
+model Payment {
+  id            String         @id @default(cuid())
+  parrainId     String
+  parrain       ParrainProfile @relation(fields: [parrainId], references: [id], onDelete: Restrict)
+  sponsorshipId String?
+  sponsorship   Sponsorship?   @relation(fields: [sponsorshipId], references: [id], onDelete: Restrict)
+  childId       String?
+  child         Child?         @relation(fields: [childId], references: [id], onDelete: Restrict)
+  kind          PaymentKind
+  amountCents   Int
+  method        PaymentMethod
+  label         String?
+  dueDate       DateTime       @db.Date
+  paidAt        DateTime?
+  status        PaymentStatus  @default(SCHEDULED)
+  reference     String         @unique
+  periodKey     String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@unique([sponsorshipId, periodKey])
+  @@index([parrainId, dueDate])
+  @@index([childId, dueDate])
+  @@index([status, dueDate])
 }
 
 // ─── Transverse ───────────────────────────────────────────────────────────────

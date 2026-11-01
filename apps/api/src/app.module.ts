@@ -6,7 +6,9 @@ import { auth } from "./auth/auth.js";
 import { validateEnv } from "./config/env.js";
 import { HealthModule } from "./health/health.module.js";
 import { MailModule } from "./mail/mail.module.js";
+import { MediaModule } from "./media/media.module.js";
 import { MeModule } from "./me/me.module.js";
+import { ParrainModule } from "./parrain/parrain.module.js";
 import { PrismaModule } from "./prisma/prisma.module.js";
 import { StorageModule } from "./storage/storage.module.js";
 
@@ -28,6 +30,8 @@ import { StorageModule } from "./storage/storage.module.js";
     HealthModule,
     MeModule,
     AdminModule,
+    MediaModule,
+    ParrainModule,
   ],
 })
 export class AppModule {}

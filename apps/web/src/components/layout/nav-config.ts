@@ -6,6 +6,8 @@ export type NavItem = {
   label: string;
   /** Actif uniquement sur l'adresse exacte (pages d'accueil d'un espace). */
   exact?: boolean;
+  /** Autres rubriques rattachées à l'entrée, sous-pages comprises (« Tout le fil »). */
+  subPaths?: readonly string[];
   /** Compteur affiché à droite du libellé (messages non lus, file de modération). */
   count?: number;
   /** Complément lu après le compteur, par ex. « non lus ». */
@@ -21,7 +23,13 @@ export const LOGOUT_ACTION = "/deconnexion";
 export const logoutItem: MenuItem = { label: "Se déconnecter", action: LOGOUT_ACTION };
 
 export const parrainNav = [
-  { key: "filleuls", href: "/parrain", label: "Mes filleuls", exact: true },
+  {
+    key: "filleuls",
+    href: "/parrain",
+    label: "Mes filleuls",
+    exact: true,
+    subPaths: ["/parrain/nouvelles", "/parrain/filleuls"],
+  },
   { key: "messages", href: "/parrain/messages", label: "Messages", countLabel: "non lus" },
   { key: "appels", href: "/parrain/appels", label: "Appels vidéo" },
   { key: "versements", href: "/parrain/versements", label: "Mes versements" },
@@ -84,15 +92,22 @@ export function withCounts<T extends NavItem>(
   );
 }
 
+/** Longueur du plus long préfixe de l'entrée qui couvre l'adresse, -1 sinon. */
+function matchLength(item: NavItem, pathname: string): number {
+  if (item.exact && pathname === item.href) return item.href.length;
+  const prefixes = [...(item.exact ? [] : [item.href]), ...(item.subPaths ?? [])];
+  return prefixes
+    .filter((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+    .reduce((longest, prefix) => Math.max(longest, prefix.length), -1);
+}
+
 /** L'entrée active d'après l'adresse : le plus long préfixe gagne. */
 export function findActiveKey(items: readonly NavItem[], pathname: string | null) {
   if (!pathname) return undefined;
-  let best: NavItem | undefined;
+  let best: { key: string; length: number } | undefined;
   for (const item of items) {
-    const matches = item.exact
-      ? pathname === item.href
-      : pathname === item.href || pathname.startsWith(`${item.href}/`);
-    if (matches && (!best || item.href.length > best.href.length)) best = item;
+    const length = matchLength(item, pathname);
+    if (length >= 0 && (!best || length > best.length)) best = { key: item.key, length };
   }
   return best?.key;
 }

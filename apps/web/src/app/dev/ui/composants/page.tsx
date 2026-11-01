@@ -12,6 +12,7 @@ import {
   CardTitle,
   Checkbox,
   Chip,
+  ChildSwitcher,
   CountBadge,
   EmptyState,
   FileIcon,
@@ -21,6 +22,7 @@ import {
   Input,
   LockIcon,
   Logo,
+  MediaTile,
   MessageIcon,
   MicIcon,
   Notice,
@@ -189,6 +191,40 @@ export default function ComposantsPage() {
           <Logo />
           <Logo tone="accent" size={44} />
         </div>
+      </Section>
+
+      <Section title="Sélecteur de filleul et médias">
+        <ChildSwitcher
+          currentId="aicha"
+          items={[
+            {
+              id: "aicha",
+              label: "Aïcha",
+              initials: "AS",
+              tone: "amber",
+              href: "/dev/ui/composants",
+            },
+            {
+              id: "kofi",
+              label: "Kofi",
+              initials: "KA",
+              tone: "brand",
+              href: "/dev/ui/composants",
+            },
+          ]}
+          className="self-start"
+        />
+        <div className="grid max-w-[640px] grid-cols-2 gap-2.5">
+          <MediaTile kind="photo" label="Photo de la classe" />
+          <MediaTile kind="document" label="Bulletin T1 — 2026-27" />
+        </div>
+        <MediaTile
+          kind="video"
+          label="Nouvelle de rentrée"
+          duration="0:42"
+          size="lg"
+          className="max-w-[640px]"
+        />
       </Section>
 
       <Section title="Formulaires">

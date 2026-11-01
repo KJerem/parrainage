@@ -1,5 +1,6 @@
+/* eslint-disable @next/next/no-img-element -- photos servies par /api/media (302 vers une URL
+   présignée de 120 s) : l'optimiseur de next/image n'a pas la session du visiteur. */
 import { cva, type VariantProps } from "class-variance-authority";
-import Image from "next/image";
 import type { HTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
@@ -66,12 +67,13 @@ export function Avatar({
   return (
     <span className={cn(avatarVariants({ size: pixels, tone }), className)} {...a11y} {...props}>
       {src ? (
-        <Image
+        <img
           src={src}
           alt={alt ?? label ?? ""}
           width={pixels}
           height={pixels}
-          unoptimized
+          loading="lazy"
+          decoding="async"
           className="size-full object-cover"
         />
       ) : (
@@ -117,12 +119,13 @@ export function PhotoSquare({
       {...props}
     >
       {src ? (
-        <Image
+        <img
           src={src}
           alt={alt}
           width={size}
           height={size}
-          unoptimized
+          loading="lazy"
+          decoding="async"
           className="size-full object-cover"
         />
       ) : (
