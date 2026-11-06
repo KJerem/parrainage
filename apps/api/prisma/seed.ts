@@ -105,6 +105,18 @@ async function seedContent(content: SeedContent): Promise<{ uploaded: number }> 
       : m,
   );
 
+  // Messages laissés par des tests e2e interrompus (clé d'idempotence « e2e-… ») : supprimés,
+  // pour que les non-lus du seed restent ceux de la maquette. Les autres ajouts sont conservés.
+  const leftovers = await prisma.message.findMany({
+    where: { idempotencyKey: { contains: ":e2e-" } },
+    select: { id: true },
+  });
+  if (leftovers.length > 0) {
+    const ids = leftovers.map((m) => m.id);
+    await prisma.media.deleteMany({ where: { messageId: { in: ids } } });
+    await prisma.message.deleteMany({ where: { id: { in: ids } } });
+  }
+
   await prisma.media.deleteMany({ where: stale(media.map((m) => m.id)) });
   await prisma.message.deleteMany({ where: stale(content.messages.map((m) => m.id)) });
   await prisma.newsPost.deleteMany({ where: stale(content.news.map((n) => n.id)) });
@@ -209,10 +221,13 @@ async function main() {
   const content = buildSeedContent(today, data);
   const { uploaded } = await seedContent(content);
 
+  // Compteurs d'envoi de messages des comptes de démonstration remis à zéro (tests répétés).
+  await prisma.rateLimit.deleteMany({ where: { key: { startsWith: "messages:seed-user-" } } });
+
   await prisma.appSetting.upsert({
     where: { key: "seed.version" },
-    update: { value: 2 },
-    create: { key: "seed.version", value: 2 },
+    update: { value: 3 },
+    create: { key: "seed.version", value: 3 },
   });
 
   const activeChildIds = new Set(
@@ -236,7 +251,9 @@ async function main() {
   );
   console.log(
     `  ${content.news.length} nouvelles, ${content.messages.length} messages, ` +
-      `${content.conversations.length} conversations, ${content.results.length} résultats, ` +
+      `${content.conversations.length} conversations ` +
+      `(${content.conversations.filter((c) => c.kind !== "SPONSORSHIP").length} entre adultes), ` +
+      `${content.results.length} résultats, ` +
       `${content.payments.length} versements, ${content.media.length} médias ` +
       `(${uploaded} fichier${uploaded > 1 ? "s" : ""} déposé${uploaded > 1 ? "s" : ""})`,
   );

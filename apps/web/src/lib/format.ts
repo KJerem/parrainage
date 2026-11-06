@@ -6,6 +6,9 @@ const LOCALE = "fr-FR";
 /** Fuseau des parrains (France) : « hier » et « aujourd'hui » se comptent à l'heure de Paris. */
 export const PARRAIN_TIME_ZONE = "Europe/Paris";
 
+/** Fuseau des relais (Togo, UTC toute l'année). */
+export const RELAIS_TIME_ZONE = "Africa/Lome";
+
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const wholeEuros = new Intl.NumberFormat(LOCALE, {
@@ -164,4 +167,47 @@ export function formatRelativeDay(
   }
   const withYear = yearIn(at, timeZone) !== yearIn(reference, timeZone);
   return formatDayMonth(at, { month, withYear, timeZone });
+}
+
+const clockFormats = new Map<string, Intl.DateTimeFormat>();
+
+/** Heure « 15:00 » dans le fuseau. */
+export function formatClock(date: Date | string, timeZone = PARRAIN_TIME_ZONE): string {
+  let format = clockFormats.get(timeZone);
+  if (!format) {
+    format = new Intl.DateTimeFormat(LOCALE, { hour: "2-digit", minute: "2-digit", timeZone });
+    clockFormats.set(timeZone, format);
+  }
+  return format.format(new Date(date));
+}
+
+/** Jour civil « 2026-10-30 » dans le fuseau : regroupe les messages d'un même jour. */
+export function civilDayKey(date: Date | string, timeZone = PARRAIN_TIME_ZONE): string {
+  const days = dayNumber(new Date(date), timeZone);
+  return new Date(days * MS_PER_DAY).toISOString().slice(0, 10);
+}
+
+/**
+ * Date d'une liste de conversations (P-Messages) : « 15:00 » le jour même, « hier »,
+ * « il y a 3 j », puis « 2 sept. » (« 2 sept. 2025 » une autre année).
+ */
+export function formatListDate(
+  date: Date | string,
+  now: Date | string,
+  timeZone = PARRAIN_TIME_ZONE,
+): string {
+  const relative = formatRelativeDay(date, now, { month: "short", timeZone });
+  if (relative === "Aujourd'hui") {
+    return formatClock(date, timeZone);
+  }
+  return relative === "Hier" ? "hier" : relative;
+}
+
+/** Séparateur de jour d'un fil : « Aujourd'hui », « Hier », « 14 octobre ». */
+export function formatDaySeparator(
+  date: Date | string,
+  now: Date | string,
+  timeZone = PARRAIN_TIME_ZONE,
+): string {
+  return formatRelativeDay(date, now, { maxDays: 1, timeZone });
 }

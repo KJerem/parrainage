@@ -13,6 +13,7 @@ import { Chip } from "@/components/ui/chip";
 import { features } from "@/lib/features";
 import { formatRelativeDay } from "@/lib/format";
 import { sentFromLabels } from "@/lib/labels";
+import { EncouragementButton } from "./encouragement-button";
 import { MediaGallery } from "./media";
 
 /** L'enfant auteur des messages du fil. */
@@ -110,9 +111,7 @@ export function FeedMessageCard({
           <Button href={conversation} variant="secondary">
             Répondre
           </Button>
-          <Button href={`${conversation}?encouragement=1`} variant="soft-accent">
-            Envoyer un encouragement
-          </Button>
+          <EncouragementButton conversationId={item.conversationId} />
         </div>
       ) : null}
     </Card>

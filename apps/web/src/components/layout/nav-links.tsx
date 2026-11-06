@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { CountBadge } from "@/components/ui/chip";
 import { cn } from "@/lib/cn";
-import { findActiveKey, type NavItem } from "./nav-config";
+import { countLabelFor, findActiveKey, type NavItem } from "./nav-config";
 
 /** `active` explicite, sinon déduit de l'adresse (coquille placée dans un layout). */
 export function useActiveKey(items: readonly NavItem[], active?: string) {
@@ -58,7 +58,7 @@ export function ParrainNav({ items, active, className }: ParrainNavProps) {
               >
                 {item.label}
                 {item.count ? (
-                  <CountBadge count={item.count} srLabel={item.countLabel} className="ml-1" />
+                  <CountBadge count={item.count} srLabel={countLabelFor(item)} className="ml-1" />
                 ) : null}
               </Link>
             </li>
@@ -114,7 +114,7 @@ export function SidebarNav({ items, active, tone, className, ...aria }: SidebarN
                 {item.count ? (
                   <CountBadge
                     count={item.count}
-                    srLabel={item.countLabel}
+                    srLabel={countLabelFor(item)}
                     className="ml-auto px-2"
                   />
                 ) : null}

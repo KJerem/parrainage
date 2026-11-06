@@ -28,3 +28,15 @@ export default function globalSetup() {
     stdio: "inherit",
   });
 }
+
+/**
+ * Remet les données du seed (non-lus, messages ajoutés par les tests « e2e-… », compteurs
+ * d'envoi), sans toucher au schéma : pour les tests qui écrivent, avant chaque projet.
+ */
+export function reseed() {
+  execSync("npm run db:seed -w @parrainage/api", {
+    cwd: path.join(__dirname, "..", "..", ".."),
+    env: { ...process.env, SEED_TODAY: E2E_SEED_TODAY },
+    stdio: "pipe",
+  });
+}

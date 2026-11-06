@@ -59,13 +59,17 @@ export interface SeedParticipant {
   lastReadAt: Date | null;
 }
 
+export type ConversationKind =
+  "SPONSORSHIP" | "PARRAIN_RELAIS" | "RELAIS_BUREAU" | "PARRAIN_BUREAU";
+
 export interface SeedConversation {
   id: string;
-  kind: "SPONSORSHIP";
-  sponsorshipId: string;
-  childId: string;
-  relaisId: string;
-  parrainId: string;
+  kind: ConversationKind;
+  sponsorshipId: string | null;
+  childId: string | null;
+  relaisId: string | null;
+  parrainId: string | null;
+  subject: string | null;
   lastMessageAt: Date;
   createdAt: Date;
   participants: SeedParticipant[];
@@ -74,12 +78,13 @@ export interface SeedConversation {
 export interface SeedMessage {
   id: string;
   conversationId: string;
-  kind: "TEXT";
+  kind: "TEXT" | "NEWSLETTER";
   body: string;
-  moderationStatus: "APPROVED";
+  /** Enfant ↔ parrain : relu (APPROVED) ; entre adultes : sans relecture (NOT_REQUIRED). */
+  moderationStatus: "APPROVED" | "NOT_REQUIRED";
   deliveryStatus: "VERIFIED" | "RECEIVED";
-  reviewedById: string;
-  reviewedAt: Date;
+  reviewedById: string | null;
+  reviewedAt: Date | null;
   autoApproved: boolean;
   sentFrom: "WEB" | "SCHOOL_SESSION";
   readAt: Date | null;
@@ -168,6 +173,27 @@ const periodKeyOf = (date: Date) =>
 const shortYear = (schoolYear: string) => schoolYear.replace(/^(\d{4})-\d{2}(\d{2})$/, "$1-$2");
 
 const slugOf = (id: string) => id.replace(/^seed-[a-z]+-/, "");
+
+const MONTHS = [
+  "janvier",
+  "février",
+  "mars",
+  "avril",
+  "mai",
+  "juin",
+  "juillet",
+  "août",
+  "septembre",
+  "octobre",
+  "novembre",
+  "décembre",
+];
+
+/** « d'octobre », « de novembre » : mois du jour du seed. */
+export function ofMonth(date: Date): string {
+  const month = MONTHS[date.getUTCMonth()]!;
+  return /^[aeiou]/.test(month) ? `d'${month}` : `de ${month}`;
+}
 
 /** « Photo d'Aïcha », « Photo de Kofi ». */
 export function photoOf(firstName: string): string {
@@ -382,12 +408,13 @@ export function buildSeedContent(today: Date, data: SeedData): SeedContent {
       kind: "TEXT",
       body: "Merci pour le ballon !",
       moderationStatus: "APPROVED",
-      deliveryStatus: "VERIFIED",
+      // Lu par Claire 5 h après l'envoi (dernière lecture de la conversation, ci-dessous).
+      deliveryStatus: "RECEIVED",
       reviewedById: bureauUserId,
       reviewedAt: new Date(kofiThanks.getTime() + 2 * 3600 * 1000),
       autoApproved: false,
       sentFrom: "SCHOOL_SESSION",
-      readAt: null,
+      readAt: new Date(kofiThanks.getTime() + 5 * 3600 * 1000),
       authorUserId: null,
       authorChildId: kofi.id,
       createdAt: kofiThanks,
@@ -404,7 +431,14 @@ export function buildSeedContent(today: Date, data: SeedData): SeedContent {
         (latest, m) => (m.createdAt > latest ? m.createdAt : latest),
         createdAt,
       );
-      const parrainRead = id === conversationId(claireAicha) ? claireToAicha : null;
+      // Claire a lu le merci de Kofi, pas encore le message d'Aïcha d'hier (« Aïcha vous a
+      // écrit » sur la maquette). Les autres parrains n'ont rien lu.
+      const parrainRead =
+        id === conversationId(claireAicha)
+          ? claireToAicha
+          : id === conversationId(claireKofi)
+            ? new Date(kofiThanks.getTime() + 5 * 3600 * 1000)
+            : null;
       const childRead = id === conversationId(claireAicha) ? at(ago(15), 15, 10) : null;
       return {
         id,
@@ -413,6 +447,7 @@ export function buildSeedContent(today: Date, data: SeedData): SeedContent {
         childId: s.childId,
         relaisId: data.children.find((c) => c.id === s.childId)!.relaisId,
         parrainId: s.parrainId,
+        subject: null,
         lastMessageAt,
         createdAt,
         participants: [
@@ -421,6 +456,196 @@ export function buildSeedContent(today: Date, data: SeedData): SeedContent {
         ].map((p) => ({ ...p, id: p.id.replace("seed-conversation-", "seed-participant-") })),
       };
     });
+
+  // ─── Conversations entre adultes (P-Messages et RW-Messages) ─────────────────
+  // Non-lus : Claire en a 2, comme la pastille « 2 » de la maquette (le message d'Aïcha d'hier
+  // et le créneau proposé par M. Koffi) ; M. Koffi en a 1 (la demande d'appel de Claire).
+  const parrainUserId = (slug: string) =>
+    data.parrains.find((p) => p.profile.id === `seed-parrain-${slug}`)!.id;
+  const adultMessage = (
+    slug: string,
+    conversation: string,
+    authorUserId: string,
+    body: string,
+    createdAt: Date,
+    readAt: Date | null,
+    kind: SeedMessage["kind"] = "TEXT",
+  ): SeedMessage => ({
+    id: `seed-message-${slug}`,
+    conversationId: `seed-conversation-${conversation}`,
+    kind,
+    body,
+    moderationStatus: "NOT_REQUIRED",
+    deliveryStatus: readAt ? "RECEIVED" : "VERIFIED",
+    reviewedById: null,
+    reviewedAt: null,
+    autoApproved: false,
+    sentFrom: "WEB",
+    readAt,
+    authorUserId,
+    authorChildId: null,
+    createdAt,
+  });
+  const adultConversation = (
+    slug: string,
+    spec: Pick<SeedConversation, "kind" | "childId" | "relaisId" | "parrainId" | "subject">,
+    createdAt: Date,
+    readers: readonly { who: string; userId: string; lastReadAt: Date | null }[],
+  ): SeedConversation => {
+    const id = `seed-conversation-${slug}`;
+    const own = messages.filter((m) => m.conversationId === id);
+    return {
+      id,
+      sponsorshipId: null,
+      ...spec,
+      lastMessageAt: own.reduce(
+        (latest, m) => (m.createdAt > latest ? m.createdAt : latest),
+        createdAt,
+      ),
+      createdAt,
+      participants: readers.map((r) => ({
+        id: `seed-participant-${slug}-${r.who}`,
+        userId: r.userId,
+        childId: null,
+        lastReadAt: r.lastReadAt,
+      })),
+    };
+  };
+  const koffiRelaisId = data.relais[0]!.relais.id;
+  const claireRequestAt = at(ago(3), 19);
+  const koffiSlotAt = at(ago(1), 8, 30);
+  const paulAskAt = at(ago(4), 20, 15);
+  const heleneThanksAt = at(ago(5), 18, 40);
+  const receiptsAt = at(ago(2), 10);
+  const newsletterAt = at(ago(6), 9);
+  messages.push(
+    adultMessage(
+      "claire-to-koffi",
+      "claire-koffi",
+      claireUserId,
+      "Bonjour M. Koffi, serait-il possible d'organiser un appel avec Aïcha avant Noël ? Je suis disponible le week-end.",
+      claireRequestAt,
+      null,
+    ),
+    adultMessage(
+      "koffi-to-claire",
+      "claire-koffi",
+      koffiUserId,
+      "Créneau proposé pour l'appel : samedi matin, avec Aïcha à l'école. Dites-moi s'il vous convient.",
+      koffiSlotAt,
+      null,
+    ),
+    adultMessage(
+      "paul-to-koffi",
+      "paul-koffi",
+      parrainUserId("paul"),
+      "Des nouvelles de Kofi ?",
+      paulAskAt,
+      at(ago(3), 8),
+    ),
+    adultMessage(
+      "helene-to-koffi",
+      "helene-koffi",
+      parrainUserId("helene"),
+      "Merci pour la vidéo !",
+      heleneThanksAt,
+      at(ago(5), 21),
+    ),
+    adultMessage(
+      "bureau-to-koffi",
+      "koffi-bureau",
+      bureauUserId,
+      `Reçus ${ofMonth(today)} : merci de nous transmettre les justificatifs des achats du mois.`,
+      receiptsAt,
+      at(ago(2), 12),
+    ),
+    adultMessage(
+      "bureau-newsletter-claire",
+      "claire-bureau",
+      bureauUserId,
+      `Lettre d'information ${ofMonth(today)} : la rentrée s'est bien passée à Lomé, Kara et Kpalimé, et chaque enfant parrainé a reçu son kit scolaire. Merci pour votre fidélité !`,
+      newsletterAt,
+      at(ago(5), 19),
+      "NEWSLETTER",
+    ),
+  );
+  conversations.push(
+    adultConversation(
+      "claire-koffi",
+      {
+        kind: "PARRAIN_RELAIS",
+        childId: aicha.id,
+        relaisId: koffiRelaisId,
+        parrainId: claireAicha.parrainId,
+        subject: "Demande d'appel vidéo avec Aïcha S.",
+      },
+      at(ago(3), 18),
+      [
+        { who: "parrain", userId: claireUserId, lastReadAt: claireRequestAt },
+        { who: "relais", userId: koffiUserId, lastReadAt: null },
+      ],
+    ),
+    adultConversation(
+      "paul-koffi",
+      {
+        kind: "PARRAIN_RELAIS",
+        childId: kofi.id,
+        relaisId: koffiRelaisId,
+        parrainId: "seed-parrain-paul",
+        subject: null,
+      },
+      at(ago(4), 20),
+      [
+        { who: "parrain", userId: parrainUserId("paul"), lastReadAt: paulAskAt },
+        { who: "relais", userId: koffiUserId, lastReadAt: at(ago(3), 8) },
+      ],
+    ),
+    adultConversation(
+      "helene-koffi",
+      {
+        kind: "PARRAIN_RELAIS",
+        childId: child("mariam").id,
+        relaisId: koffiRelaisId,
+        parrainId: "seed-parrain-helene",
+        subject: null,
+      },
+      at(ago(5), 18),
+      [
+        { who: "parrain", userId: parrainUserId("helene"), lastReadAt: heleneThanksAt },
+        { who: "relais", userId: koffiUserId, lastReadAt: at(ago(5), 21) },
+      ],
+    ),
+    adultConversation(
+      "koffi-bureau",
+      {
+        kind: "RELAIS_BUREAU",
+        childId: null,
+        relaisId: koffiRelaisId,
+        parrainId: null,
+        subject: null,
+      },
+      at(ago(2), 9),
+      [
+        { who: "relais", userId: koffiUserId, lastReadAt: at(ago(2), 12) },
+        { who: "bureau", userId: bureauUserId, lastReadAt: receiptsAt },
+      ],
+    ),
+    adultConversation(
+      "claire-bureau",
+      {
+        kind: "PARRAIN_BUREAU",
+        childId: null,
+        relaisId: null,
+        parrainId: claireAicha.parrainId,
+        subject: null,
+      },
+      at(ago(6), 8),
+      [
+        { who: "parrain", userId: claireUserId, lastReadAt: at(ago(5), 19) },
+        { who: "bureau", userId: bureauUserId, lastReadAt: newsletterAt },
+      ],
+    ),
+  );
 
   // Pièces jointes du message d'Aïcha : photo de la classe et bulletin du 1er trimestre (PDF réel).
   const bulletinMediaId = "seed-media-aicha-bulletin-t1";

@@ -45,6 +45,7 @@ import {
   imageCodeIcons,
   imageCodes,
 } from "@/components/ui";
+import { ChatBubble, DaySeparator, MessageItem } from "@/components/messaging/chat-bubble";
 import { InteractiveDemo } from "./interactive-demo";
 
 export const metadata: Metadata = { title: "Composants" };
@@ -346,6 +347,75 @@ export default function ComposantsPage() {
           action={<Button variant="secondary">Écrire un message</Button>}
         />
         <InteractiveDemo />
+      </Section>
+
+      <Section title="Messagerie">
+        <div className="flex flex-col gap-4 rounded-16 border border-line bg-surface-alt p-6">
+          <DaySeparator>14 octobre</DaySeparator>
+          <ChatBubble side="me" className="max-w-[70%] self-end">
+            Bravo pour ta rentrée Aïcha ! Déléguée de classe, je suis très fière de toi.
+          </ChatBubble>
+          <DaySeparator>Hier</DaySeparator>
+          <MessageItem
+            recipient="Claire"
+            srIntro="Aïcha S., hier :"
+            message={{
+              id: "demo-1",
+              kind: "TEXT",
+              side: "them",
+              author: { kind: "child", name: "Aïcha S.", initials: "AS", avatarTone: "amber" },
+              body: "Bonjour tata Claire ! J'ai eu mon bulletin du premier trimestre.",
+              masked: false,
+              attachments: [
+                {
+                  id: "demo-photo",
+                  kind: "PHOTO",
+                  status: "PLACEHOLDER",
+                  label: "Photo de classe",
+                  durationSec: null,
+                  mimeType: "image/jpeg",
+                },
+                {
+                  id: "demo-bulletin",
+                  kind: "BULLETIN",
+                  status: "PLACEHOLDER",
+                  label: "Bulletin T1",
+                  durationSec: null,
+                  mimeType: "application/pdf",
+                },
+                {
+                  id: "demo-video",
+                  kind: "VIDEO",
+                  status: "PLACEHOLDER",
+                  label: "Vidéo",
+                  durationSec: 42,
+                  mimeType: "video/mp4",
+                },
+              ],
+              sentFrom: "SCHOOL_SESSION",
+              createdAt: "2026-10-30T15:00:00.000Z",
+              status: null,
+              moderationReason: null,
+            }}
+          />
+          <MessageItem
+            recipient="Aïcha"
+            srIntro="Vous, aujourd'hui :"
+            message={{
+              id: "demo-2",
+              kind: "TEXT",
+              side: "me",
+              author: { kind: "parrain", name: "Claire M.", initials: "CM", avatarTone: "info" },
+              body: "Quelle est ta matière préférée ?",
+              masked: false,
+              attachments: [],
+              sentFrom: "WEB",
+              createdAt: "2026-10-31T10:00:00.000Z",
+              status: "en_relecture",
+              moderationReason: null,
+            }}
+          />
+        </div>
       </Section>
 
       <Section title="Icônes">

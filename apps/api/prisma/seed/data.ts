@@ -303,7 +303,7 @@ export function buildSeedData(today: Date): SeedData {
     lastInitial: "D",
     gender: "M",
     city: "Bordeaux",
-    avatarTone: "brand",
+    avatarTone: "neutral",
     joinedAt: day("2024-01-08"),
     lastActiveAt: ago(3),
   });
@@ -312,7 +312,7 @@ export function buildSeedData(today: Date): SeedData {
     lastInitial: "R",
     gender: "F",
     city: "Toulouse",
-    avatarTone: "info",
+    avatarTone: "neutral",
     joinedAt: day("2024-09-15"),
     lastActiveAt: ago(2),
   });

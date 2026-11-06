@@ -62,14 +62,67 @@ describe("contenus du seed", () => {
   });
 
   it("ouvre une conversation par binôme actif, avec le parrain et l'enfant", () => {
-    expect(content.conversations).toHaveLength(data.sponsorships.length);
-    for (const conversation of content.conversations) {
+    const sponsorship = content.conversations.filter((c) => c.kind === "SPONSORSHIP");
+    expect(sponsorship).toHaveLength(data.sponsorships.length);
+    for (const conversation of sponsorship) {
       expect(conversation.participants).toHaveLength(2);
       expect(conversation.participants.filter((p) => p.userId !== null)).toHaveLength(1);
       expect(
         conversation.participants.filter((p) => p.childId === conversation.childId),
       ).toHaveLength(1);
     }
+  });
+
+  it("ouvre les conversations entre adultes de RW-Messages et P-Messages", () => {
+    const adults = content.conversations.filter((c) => c.kind !== "SPONSORSHIP");
+    expect(adults.map((c) => [c.id, c.kind])).toEqual([
+      ["seed-conversation-claire-koffi", "PARRAIN_RELAIS"],
+      ["seed-conversation-paul-koffi", "PARRAIN_RELAIS"],
+      ["seed-conversation-helene-koffi", "PARRAIN_RELAIS"],
+      ["seed-conversation-koffi-bureau", "RELAIS_BUREAU"],
+      ["seed-conversation-claire-bureau", "PARRAIN_BUREAU"],
+    ]);
+    for (const conversation of adults) {
+      expect(conversation.participants).toHaveLength(2);
+      expect(conversation.participants.every((p) => p.userId !== null && p.childId === null)).toBe(
+        true,
+      );
+      const own = content.messages.filter((m) => m.conversationId === conversation.id);
+      expect(own.length).toBeGreaterThan(0);
+      expect(own.every((m) => m.moderationStatus === "NOT_REQUIRED")).toBe(true);
+      expect(conversation.lastMessageAt).toEqual(own.at(-1)!.createdAt);
+    }
+    const bodies = content.messages.map((m) => m.body);
+    expect(bodies).toContain("Des nouvelles de Kofi ?");
+    expect(bodies).toContain("Merci pour la vidéo !");
+    expect(bodies.some((b) => b.startsWith("Reçus d'octobre"))).toBe(true);
+    expect(content.messages.find((m) => m.kind === "NEWSLETTER")?.body).toMatch(
+      /^Lettre d'information d'octobre/,
+    );
+  });
+
+  it("laisse 2 messages non lus à Claire et 1 à M. Koffi", () => {
+    const unreadFor = (userId: string) =>
+      content.conversations.flatMap((c) => {
+        const me = c.participants.find((p) => p.userId === userId);
+        if (!me) {
+          return [];
+        }
+        return content.messages
+          .filter(
+            (m) =>
+              m.conversationId === c.id &&
+              m.authorUserId !== userId &&
+              (!me.lastReadAt || m.createdAt > me.lastReadAt),
+          )
+          .map((m) => m.id);
+      });
+    const claire = data.parrains.find((p) => p.email === "claire.m@exemple.fr")!.id;
+    expect(unreadFor(claire).sort()).toEqual([
+      "seed-message-aicha-to-claire",
+      "seed-message-koffi-to-claire",
+    ]);
+    expect(unreadFor(data.relais[0]!.id)).toEqual(["seed-message-claire-to-koffi"]);
   });
 
   it("reprend les échanges du design, dans les conversations de Claire", () => {
@@ -89,7 +142,12 @@ describe("contenus du seed", () => {
       conversationId: "seed-conversation-kofi-claire",
       body: "Merci pour le ballon !",
       createdAt: new Date("2026-09-02T15:00:00Z"),
+      deliveryStatus: "RECEIVED",
     });
+    // Lu au plus tard à la dernière lecture de Claire.
+    const kofiThread = content.conversations.find((c) => c.id === "seed-conversation-kofi-claire");
+    const claireRead = kofiThread?.participants.find((p) => p.userId !== null)?.lastReadAt;
+    expect(byId.get("seed-message-kofi-to-claire")!.readAt).toEqual(claireRead);
     const attachments = content.media.filter((m) => m.messageId === "seed-message-aicha-to-claire");
     expect(attachments.map((m) => [m.kind, m.status, m.label])).toEqual([
       ["PHOTO", "PLACEHOLDER", "Photo de la classe"],

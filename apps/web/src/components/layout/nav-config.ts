@@ -12,6 +12,8 @@ export type NavItem = {
   count?: number;
   /** Complément lu après le compteur, par ex. « non lus ». */
   countLabel?: string;
+  /** Le même au singulier (« non lu »), lu quand le compteur vaut 1. */
+  countLabelOne?: string;
 };
 
 /** Lien du menu de compte, ou action envoyée en POST (déconnexion). */
@@ -30,7 +32,13 @@ export const parrainNav = [
     exact: true,
     subPaths: ["/parrain/nouvelles", "/parrain/filleuls"],
   },
-  { key: "messages", href: "/parrain/messages", label: "Messages", countLabel: "non lus" },
+  {
+    key: "messages",
+    href: "/parrain/messages",
+    label: "Messages",
+    countLabel: "non lus",
+    countLabelOne: "non lu",
+  },
   { key: "appels", href: "/parrain/appels", label: "Appels vidéo" },
   { key: "versements", href: "/parrain/versements", label: "Mes versements" },
 ] as const satisfies readonly NavItem[];
@@ -48,7 +56,13 @@ export const relaisNav = [
   { key: "ajouter", href: "/relais/enfants/nouveau", label: "Ajouter un enfant" },
   { key: "publier", href: "/relais/publier", label: "Publier une nouvelle" },
   { key: "resultats", href: "/relais/resultats", label: "Résultats scolaires" },
-  { key: "messages", href: "/relais/messages", label: "Messages", countLabel: "non lus" },
+  {
+    key: "messages",
+    href: "/relais/messages",
+    label: "Messages",
+    countLabel: "non lus",
+    countLabelOne: "non lu",
+  },
   { key: "sessions", href: "/relais/sessions", label: "Sessions élèves" },
 ] as const satisfies readonly NavItem[];
 
@@ -68,6 +82,7 @@ export const bureauNav = [
     href: "/bureau/moderation",
     label: "Modération",
     countLabel: "messages à relire",
+    countLabelOne: "message à relire",
   },
   { key: "reseau", href: "/bureau/reseau", label: "Réseau et finances" },
   { key: "parrains", href: "/bureau/parrains", label: "Parrains" },
@@ -81,6 +96,11 @@ export const bureauIdentityMenu: readonly MenuItem[] = [
   { label: "Notifications", href: "/bureau/notifications" },
   logoutItem,
 ];
+
+/** Complément du compteur, accordé : « 1 non lu », « 2 non lus ». */
+export function countLabelFor(item: NavItem): string | undefined {
+  return item.count === 1 ? (item.countLabelOne ?? item.countLabel) : item.countLabel;
+}
 
 /** Ajoute les compteurs (`{ messages: 2 }`) aux entrées correspondantes. */
 export function withCounts<T extends NavItem>(

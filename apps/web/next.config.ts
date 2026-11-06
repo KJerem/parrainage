@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
-// Origine publique du stockage S3 : /api/media/:id redirige (302) vers une URL présignée.
+// Origine publique du stockage S3 : /api/media/:id redirige (302) vers une URL présignée, et le
+// navigateur y dépose directement les pièces jointes (PUT présignés de /api/uploads).
 const mediaOrigin = new URL(process.env.S3_PUBLIC_ENDPOINT ?? "http://localhost:9000").origin;
 
 // CSP en mode « Report-Only » pendant le développement ; elle sera appliquée (avec nonce)
@@ -12,7 +13,7 @@ const contentSecurityPolicy = [
   `img-src 'self' data: blob: ${mediaOrigin}`,
   `media-src 'self' blob: ${mediaOrigin}`,
   "font-src 'self'",
-  "connect-src 'self'",
+  `connect-src 'self' ${mediaOrigin}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

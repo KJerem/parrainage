@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { bureauNav, findActiveKey, parrainNav, relaisNav } from "./nav-config";
+import {
+  bureauNav,
+  countLabelFor,
+  findActiveKey,
+  parrainNav,
+  relaisNav,
+  withCounts,
+} from "./nav-config";
 
 describe("findActiveKey", () => {
   it.each([
@@ -26,5 +33,19 @@ describe("findActiveKey", () => {
     expect(findActiveKey(relaisNav, "/relais/enfants/e1")).toBe("enfants");
     expect(findActiveKey(bureauNav, "/bureau/moderation/m1")).toBe("moderation");
     expect(findActiveKey(bureauNav, "/bureau/profil")).toBeUndefined();
+  });
+});
+
+describe("compteurs de la navigation", () => {
+  it("accorde le complément lu après le compteur", () => {
+    const [messages] = withCounts(
+      parrainNav.filter((item) => item.key === "messages"),
+      { messages: 1 },
+    );
+    expect(countLabelFor(messages!)).toBe("non lu");
+    expect(countLabelFor({ ...messages!, count: 2 })).toBe("non lus");
+    const moderation = bureauNav.find((item) => item.key === "moderation")!;
+    expect(countLabelFor({ ...moderation, count: 1 })).toBe("message à relire");
+    expect(countLabelFor({ ...moderation, count: 12 })).toBe("messages à relire");
   });
 });

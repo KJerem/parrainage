@@ -1,4 +1,16 @@
-import { GetObjectCommand, HeadBucketCommand, type S3Client } from "@aws-sdk/client-s3";
+import {
+  AbortMultipartUploadCommand,
+  CompleteMultipartUploadCommand,
+  CreateMultipartUploadCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadBucketCommand,
+  HeadObjectCommand,
+  ListPartsCommand,
+  PutObjectCommand,
+  type S3Client,
+  UploadPartCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -7,6 +19,24 @@ import { createS3Client } from "./s3-client.js";
 
 /** Durée de validité d'une URL de lecture présignée, en secondes. */
 export const PRESIGNED_GET_TTL_SECONDS = 120;
+
+/** Durée de validité d'une URL d'envoi présignée (PUT simple ou part multipart), en secondes. */
+export const PRESIGNED_PUT_TTL_SECONDS = 300;
+
+export interface StoredPart {
+  partNumber: number;
+  etag: string;
+  sizeBytes: number;
+}
+
+/** Erreur « objet introuvable » du SDK S3 (HeadObject, GetObject). */
+export function isNotFound(error: unknown): boolean {
+  const { name, $metadata } = (error ?? {}) as {
+    name?: string;
+    $metadata?: { httpStatusCode?: number };
+  };
+  return name === "NotFound" || name === "NoSuchKey" || $metadata?.httpStatusCode === 404;
+}
 
 export interface PresignGetOptions {
   /** Type renvoyé par le stockage (celui enregistré pour le média). */
@@ -73,5 +103,138 @@ export class StorageService {
         : {}),
     });
     return getSignedUrl(this.publicClient, command, { expiresIn: PRESIGNED_GET_TTL_SECONDS });
+  }
+
+  /**
+   * URL de dépôt présignée (300 s) sur l'hôte public. Le type et la taille sont signés : le
+   * navigateur doit envoyer exactement ce Content-Type, et un corps d'une autre taille est refusé.
+   */
+  presignPut(key: string, contentType: string, sizeBytes: number): Promise<string> {
+    const command = new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      ContentType: contentType,
+      ContentLength: sizeBytes,
+    });
+    return getSignedUrl(this.publicClient, command, {
+      expiresIn: PRESIGNED_PUT_TTL_SECONDS,
+      signableHeaders: new Set(["content-type", "content-length"]),
+    });
+  }
+
+  async createMultipartUpload(key: string, contentType: string): Promise<string> {
+    const { UploadId } = await this.client.send(
+      new CreateMultipartUploadCommand({ Bucket: this.bucket, Key: key, ContentType: contentType }),
+    );
+    if (!UploadId) {
+      throw new Error("Le stockage n'a pas ouvert d'envoi multipart");
+    }
+    return UploadId;
+  }
+
+  /** URL de dépôt d'une part. La taille est signée : une part d'une autre taille est refusée. */
+  presignUploadPart(
+    key: string,
+    uploadId: string,
+    partNumber: number,
+    sizeBytes: number,
+  ): Promise<string> {
+    const command = new UploadPartCommand({
+      Bucket: this.bucket,
+      Key: key,
+      UploadId: uploadId,
+      PartNumber: partNumber,
+      ContentLength: sizeBytes,
+    });
+    return getSignedUrl(this.publicClient, command, {
+      expiresIn: PRESIGNED_PUT_TTL_SECONDS,
+      signableHeaders: new Set(["content-length"]),
+    });
+  }
+
+  /** Parts déjà reçues d'un envoi multipart, par numéro croissant. */
+  async listParts(key: string, uploadId: string): Promise<StoredPart[]> {
+    const parts: StoredPart[] = [];
+    let marker: string | undefined;
+    for (;;) {
+      const page = await this.client.send(
+        new ListPartsCommand({
+          Bucket: this.bucket,
+          Key: key,
+          UploadId: uploadId,
+          ...(marker ? { PartNumberMarker: marker } : {}),
+        }),
+      );
+      for (const part of page.Parts ?? []) {
+        if (part.PartNumber !== undefined && part.ETag) {
+          parts.push({ partNumber: part.PartNumber, etag: part.ETag, sizeBytes: part.Size ?? 0 });
+        }
+      }
+      if (!page.IsTruncated || !page.NextPartNumberMarker) {
+        break;
+      }
+      marker = page.NextPartNumberMarker;
+    }
+    return parts.sort((a, b) => a.partNumber - b.partNumber);
+  }
+
+  async completeMultipartUpload(
+    key: string,
+    uploadId: string,
+    parts: readonly StoredPart[],
+  ): Promise<void> {
+    await this.client.send(
+      new CompleteMultipartUploadCommand({
+        Bucket: this.bucket,
+        Key: key,
+        UploadId: uploadId,
+        MultipartUpload: {
+          Parts: parts.map((p) => ({ PartNumber: p.partNumber, ETag: p.etag })),
+        },
+      }),
+    );
+  }
+
+  async abortMultipartUpload(key: string, uploadId: string): Promise<void> {
+    await this.client.send(
+      new AbortMultipartUploadCommand({ Bucket: this.bucket, Key: key, UploadId: uploadId }),
+    );
+  }
+
+  /** Taille de l'objet, ou `null` s'il n'existe pas. */
+  async objectSize(key: string): Promise<number | null> {
+    try {
+      const head = await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }));
+      return head.ContentLength ?? 0;
+    } catch (error) {
+      if (isNotFound(error)) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async getObject(key: string): Promise<Buffer> {
+    const object = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+    if (!object.Body) {
+      throw new Error(`Objet vide : ${key}`);
+    }
+    return Buffer.from(await object.Body.transformToByteArray());
+  }
+
+  async putObject(key: string, body: Buffer, contentType: string): Promise<void> {
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: body,
+        ContentType: contentType,
+        ContentLength: body.length,
+      }),
+    );
+  }
+
+  async deleteObject(key: string): Promise<void> {
+    await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
   }
 }

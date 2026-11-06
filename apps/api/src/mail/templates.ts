@@ -7,6 +7,7 @@ export interface MailContent {
 }
 
 const SIGNATURE = "L'association LRT";
+const IGNORE = "Si vous n'êtes pas à l'origine de cette demande, ignorez simplement ce message.";
 
 function escapeHtml(value: string): string {
   return value
@@ -17,17 +18,23 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
+/** E-mail à un seul bouton ; `notes` : lignes sous le bouton (validité du lien, consigne…). */
 function linkEmail(options: {
   subject: string;
   intro: string;
   action: string;
   url: string;
-  validity: string;
+  notes: readonly string[];
 }): MailContent {
-  const { subject, intro, action, url, validity } = options;
-  const ignore = "Si vous n'êtes pas à l'origine de cette demande, ignorez simplement ce message.";
-  const text = ["Bonjour,", "", intro, "", url, "", validity, ignore, "", SIGNATURE].join("\n");
+  const { subject, intro, action, url, notes } = options;
+  const text = ["Bonjour,", "", intro, "", url, "", ...notes, "", SIGNATURE].join("\n");
   const href = escapeHtml(url);
+  const noteHtml = notes
+    .map(
+      (note) =>
+        `      <p style="margin:0 0 8px;font-size:14px;color:#5a6662">${escapeHtml(note)}</p>\n`,
+    )
+    .join("");
   const html = `<!doctype html>
 <html lang="fr">
   <body style="margin:0;padding:24px;background:#f6f4ee;font-family:Arial,sans-serif;color:#17201d">
@@ -37,9 +44,7 @@ function linkEmail(options: {
       <p style="margin:0 0 24px">
         <a href="${href}" style="display:inline-block;background:#1e5c4e;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 20px;border-radius:8px">${escapeHtml(action)}</a>
       </p>
-      <p style="margin:0 0 8px;font-size:14px;color:#5a6662">${escapeHtml(validity)}</p>
-      <p style="margin:0 0 24px;font-size:14px;color:#5a6662">${escapeHtml(ignore)}</p>
-      <p style="margin:0;font-size:14px;color:#5a6662">Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :<br><a href="${href}" style="color:#1e5c4e;word-break:break-all">${href}</a></p>
+${noteHtml}      <p style="margin:16px 0 0;font-size:14px;color:#5a6662">Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :<br><a href="${href}" style="color:#1e5c4e;word-break:break-all">${href}</a></p>
       <p style="margin:24px 0 0;font-size:14px">${SIGNATURE}</p>
     </div>
   </body>
@@ -53,7 +58,7 @@ export function magicLinkEmail(url: string): MailContent {
     intro: "Voici votre lien pour vous connecter à la plateforme de parrainage LRT.",
     action: "Me connecter",
     url,
-    validity: "Ce lien est valable 10 minutes et ne fonctionne qu'une seule fois.",
+    notes: ["Ce lien est valable 10 minutes et ne fonctionne qu'une seule fois.", IGNORE],
   });
 }
 
@@ -63,6 +68,20 @@ export function resetPasswordEmail(url: string): MailContent {
     intro: "Une réinitialisation du mot de passe de votre compte a été demandée.",
     action: "Choisir un nouveau mot de passe",
     url,
-    validity: "Ce lien est valable 1 heure.",
+    notes: ["Ce lien est valable 1 heure.", IGNORE],
+  });
+}
+
+/**
+ * Nouveau message d'adulte à adulte : aucune ligne du message, seulement le lien vers la page
+ * Messages (connexion requise). Jamais d'e-mail pour un message destiné à un enfant.
+ */
+export function newMessageEmail(url: string): MailContent {
+  return linkEmail({
+    subject: "Nouveau message sur Parrainage LRT",
+    intro: "Vous avez reçu un nouveau message sur la plateforme de parrainage LRT.",
+    action: "Lire le message",
+    url,
+    notes: ["Connectez-vous à votre espace pour le lire et y répondre."],
   });
 }

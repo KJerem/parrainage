@@ -149,6 +149,7 @@ export function RelaisResponsiveShell({
   active,
   mobileActive,
   mobileHeader,
+  counts,
   ...props
 }: RelaisResponsiveShellProps) {
   const bottomActive =
@@ -158,10 +159,11 @@ export function RelaisResponsiveShell({
     <AppSidebarShell
       tone="relais"
       active={active}
+      counts={counts}
       {...props}
       mobile={{
         header: mobileHeader,
-        bottomNav: <RelaisBottomNav active={bottomActive} className="md:hidden" />,
+        bottomNav: <RelaisBottomNav active={bottomActive} counts={counts} className="md:hidden" />,
       }}
     />
   );

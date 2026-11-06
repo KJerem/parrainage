@@ -1,7 +1,7 @@
 import { test } from "@playwright/test";
-import { test as parrainTest } from "./fixtures";
+import { test as parrainTest, relaisTest } from "./fixtures";
 import { expectNoOverflowAt, overflowWidths } from "./overflow";
-import { e2eRoutes, parrainRoutes } from "./routes";
+import { e2eRoutes, parrainRoutes, relaisRoutes } from "./routes";
 
 test.describe("Pas de débordement horizontal", () => {
   test.beforeEach(({}, testInfo) => {
@@ -28,6 +28,23 @@ parrainTest.describe("Pas de débordement horizontal (espace parrain, connecté)
   for (const route of parrainRoutes) {
     for (const width of overflowWidths) {
       parrainTest(`${route.path} à ${width} px`, async ({ page }) => {
+        await expectNoOverflowAt(page, route.path, width);
+      });
+    }
+  }
+});
+
+relaisTest.describe("Pas de débordement horizontal (espace relais, connecté)", () => {
+  relaisTest.beforeEach(({}, testInfo) => {
+    relaisTest.skip(
+      testInfo.project.name !== "desktop-1440",
+      "Largeurs pilotées depuis desktop-1440",
+    );
+  });
+
+  for (const route of relaisRoutes) {
+    for (const width of overflowWidths) {
+      relaisTest(`${route.path} à ${width} px`, async ({ page }) => {
         await expectNoOverflowAt(page, route.path, width);
       });
     }

@@ -8,9 +8,11 @@ import { HealthModule } from "./health/health.module.js";
 import { MailModule } from "./mail/mail.module.js";
 import { MediaModule } from "./media/media.module.js";
 import { MeModule } from "./me/me.module.js";
+import { MessagingModule } from "./messaging/messaging.module.js";
 import { ParrainModule } from "./parrain/parrain.module.js";
 import { PrismaModule } from "./prisma/prisma.module.js";
 import { StorageModule } from "./storage/storage.module.js";
+import { UploadsModule } from "./uploads/uploads.module.js";
 
 @Module({
   imports: [
@@ -32,6 +34,8 @@ import { StorageModule } from "./storage/storage.module.js";
     AdminModule,
     MediaModule,
     ParrainModule,
+    UploadsModule,
+    MessagingModule,
   ],
 })
 export class AppModule {}

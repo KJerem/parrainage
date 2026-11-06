@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, saveSession, test } from "./fixtures";
-import { AICHA, KOFI, YAO } from "./routes";
+import { AICHA, AICHA_CONVERSATION, KOFI, YAO } from "./routes";
 
 const projects = ["desktop-1440", "mobile-390"];
 
@@ -86,14 +86,20 @@ test.describe("Espace parrain : Mes filleuls", () => {
       payments.getByRole("list", { name: "Dernières mensualités" }).getByRole("listitem"),
     ).toHaveText([/^Octobre 2026\s*Reçu$/, /^Septembre 2026\s*Reçu$/, /^Août 2026\s*Reçu$/]);
 
+    // Messagerie (phase 4) : écrire, répondre et encourager depuis l'écran principal.
+    const conversation = `/parrain/messages/${AICHA_CONVERSATION}`;
+    await expect(profile.getByRole("link", { name: "Écrire à Aïcha" })).toHaveAttribute(
+      "href",
+      conversation,
+    );
+    await expect(message.getByRole("link", { name: "Répondre" })).toHaveAttribute(
+      "href",
+      conversation,
+    );
+    await expect(message.getByRole("button", { name: "Envoyer un encouragement" })).toBeVisible();
+
     // Phases suivantes (drapeaux) : aucun lien mort.
-    for (const name of [
-      "Écrire à Aïcha",
-      "Demander un appel vidéo",
-      "Répondre",
-      "Envoyer un encouragement",
-      "Télécharger mon reçu fiscal",
-    ]) {
+    for (const name of ["Demander un appel vidéo", "Télécharger mon reçu fiscal"]) {
       await expect(page.getByRole("link", { name })).toHaveCount(0);
       await expect(page.getByRole("button", { name })).toHaveCount(0);
     }
@@ -221,7 +227,7 @@ test.describe("Espace parrain : Mes filleuls", () => {
   test("les rubriques à venir ont une page d'attente", async ({ page }) => {
     await page.goto("/parrain");
     const nav = mainNav(page);
-    for (const name of ["Messages", "Appels vidéo", "Mes versements"]) {
+    for (const name of ["Appels vidéo", "Mes versements"]) {
       await nav.getByRole("link", { name }).click();
       await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
       await expect(page.getByText("Cette rubrique arrive bientôt")).toBeVisible();

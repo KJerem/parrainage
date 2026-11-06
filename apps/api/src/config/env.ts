@@ -23,6 +23,14 @@ export const envSchema = z
     SMTP_HOST: z.string().default("localhost"),
     SMTP_PORT: z.coerce.number().int().default(1025),
     MAIL_FROM: z.string().default("Parrainage LRT <no-reply@parrainage.local>"),
+    /** Plafonds des fichiers joints aux messages, en Mo, et durée maximale d'une vidéo. */
+    UPLOAD_MAX_PHOTO_MB: z.coerce.number().positive().max(100).default(10),
+    UPLOAD_MAX_VIDEO_MB: z.coerce.number().positive().max(100).default(25),
+    UPLOAD_MAX_DOC_MB: z.coerce.number().positive().max(100).default(10),
+    VIDEO_MAX_SECONDS: z.coerce.number().int().positive().default(120),
+    /** Messages (et encouragements) par utilisateur et par fenêtre glissante. */
+    MESSAGE_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
+    MESSAGE_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(600),
     /** Horloge figée (démo, e2e) : « 2026-10-31T10:00:00Z ». Vide : heure réelle. */
     APP_NOW: z.preprocess(
       (value) => (value === "" ? undefined : value),

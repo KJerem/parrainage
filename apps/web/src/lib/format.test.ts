@@ -1,15 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
+  civilDayKey,
   formatAge,
   formatAverage,
+  formatClock,
   formatDayMonth,
+  formatDaySeparator,
   formatDuration,
   formatEuros,
+  formatListDate,
   formatLongDate,
   formatMonthYear,
   formatPeriodKey,
   formatRank,
   formatRelativeDay,
+  RELAIS_TIME_ZONE,
 } from "./format";
 
 const NBSP = " ";
@@ -111,5 +116,37 @@ describe("formatRelativeDay", () => {
 
   it("accepte des objets Date", () => {
     expect(formatRelativeDay(new Date("2026-10-30T15:00:00Z"), new Date(now))).toBe("Hier");
+  });
+});
+
+describe("dates de la messagerie", () => {
+  const now = "2026-10-31T10:00:00Z";
+
+  it("affiche l'heure le jour même, puis « hier » et le jour court (P-Messages)", () => {
+    expect(formatListDate("2026-10-31T08:05:00Z", now)).toBe("09:05");
+    expect(formatListDate("2026-10-30T15:00:00Z", now)).toBe("hier");
+    expect(formatListDate("2026-10-27T15:00:00Z", now)).toBe("il y a 4 j");
+    expect(formatListDate("2026-09-02T15:00:00Z", now)).toBe("2 sept.");
+    expect(formatListDate("2025-09-02T15:00:00Z", now)).toBe("2 sept. 2025");
+  });
+
+  it("compte les jours dans le fuseau du lecteur", () => {
+    // 23 h 30 à Paris le 30, mais déjà le 31 en UTC… et l'inverse à Lomé.
+    expect(formatListDate("2026-10-30T22:30:00Z", now)).toBe("hier");
+    expect(formatListDate("2026-10-30T22:30:00Z", now, RELAIS_TIME_ZONE)).toBe("hier");
+    expect(formatClock("2026-10-31T08:05:00Z", RELAIS_TIME_ZONE)).toBe("08:05");
+  });
+
+  it("sépare les jours d'un fil comme la maquette", () => {
+    expect(formatDaySeparator("2026-10-31T09:00:00Z", now)).toBe("Aujourd'hui");
+    expect(formatDaySeparator("2026-10-30T15:00:00Z", now)).toBe("Hier");
+    expect(formatDaySeparator("2026-10-28T15:00:00Z", now)).toBe("28 octobre");
+    expect(formatDaySeparator("2026-10-14T15:30:00Z", now)).toBe("14 octobre");
+  });
+
+  it("regroupe par jour civil", () => {
+    expect(civilDayKey("2026-10-30T22:30:00Z")).toBe("2026-10-30");
+    expect(civilDayKey("2026-10-30T23:30:00Z")).toBe("2026-10-31");
+    expect(civilDayKey("2026-10-30T23:30:00Z", RELAIS_TIME_ZONE)).toBe("2026-10-30");
   });
 });

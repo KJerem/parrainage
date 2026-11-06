@@ -301,6 +301,8 @@ model Media {
   kind             MediaKind
   status           MediaStatus   @default(PENDING_UPLOAD)
   storageKey       String?       @unique
+  /// Envoi multipart S3 en cours (fichier de plus de 5 Mo) ; effacé une fois le fichier assemblé.
+  uploadId         String?
   posterKey        String?
   mimeType         String
   sizeBytes        Int?
@@ -524,11 +526,10 @@ enum DeliveryStatus {
   RECEIVED
 }
 
-/// Alertes du détecteur automatique (plan §8).
+/// Alertes du détecteur automatique (`detectAlerts` de @parrainage/contracts) : une suite de
+/// chiffres ou un nombre écrit en lettres compte comme un téléphone (PHONE).
 enum AlertType {
   PHONE
-  DIGITS
-  NUMBER_WORDS
   EMAIL
   URL
   SOCIAL

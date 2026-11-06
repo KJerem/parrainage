@@ -130,6 +130,34 @@ describe("canViewMedia : messages", () => {
     expect(viewers(media)).toEqual(["marc", "koffi", "bureau"]);
   });
 
+  it("réserve les échanges avec le bureau au relais ou au parrain concerné", () => {
+    const adult = (conversationKind: "RELAIS_BUREAU" | "PARRAIN_BUREAU") =>
+      ({
+        ...base,
+        uploadedByUserId: "u-bureau",
+        message: {
+          moderationStatus: "NOT_REQUIRED",
+          conversationKind,
+          activeSponsorParrainId: null,
+          parrainId: conversationKind === "PARRAIN_BUREAU" ? "p-claire" : null,
+          relaisIds: conversationKind === "RELAIS_BUREAU" ? ["r-lome"] : [],
+        },
+      }) satisfies MediaFacts;
+    expect(viewers(adult("RELAIS_BUREAU"))).toEqual(["koffi", "bureau"]);
+    expect(viewers(adult("PARRAIN_BUREAU"))).toEqual(["claire", "bureau"]);
+    expect(isChildMedia(adult("PARRAIN_BUREAU"))).toBe(false);
+  });
+
+  it("ne montre une pièce jointe en cours d'envoi qu'à son auteur", () => {
+    const uploading: MediaFacts = {
+      ...base,
+      status: "PENDING_UPLOAD",
+      uploadedByUserId: "u-claire",
+    };
+    expect(viewers(uploading)).toEqual(["claire"]);
+    expect(viewers({ ...uploading, status: "REJECTED" })).toEqual([]);
+  });
+
   it("laisse toujours l'auteur voir sa pièce jointe, même en relecture", () => {
     const own = { ...childMessage("PENDING"), uploadedByUserId: "u-paul" };
     expect(canViewMedia(paul, own)).toBe(true);

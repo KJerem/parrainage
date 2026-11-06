@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { CountBadge } from "@/components/ui/chip";
 import { HomeIcon, MessageIcon, UserIcon, UsersIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { useActiveKey } from "./nav-links";
@@ -16,11 +17,13 @@ export type RelaisBottomNavKey = (typeof items)[number]["key"];
 
 export type RelaisBottomNavProps = {
   active?: RelaisBottomNavKey;
+  /** Compteurs par clé, par ex. `{ messages: 1 }` (messages non lus). */
+  counts?: Partial<Record<string, number>>;
   className?: string;
 };
 
 /** Barre du bas de l'appli relais (sous md), collée au bas de l'écran. */
-export function RelaisBottomNav({ active, className }: RelaisBottomNavProps) {
+export function RelaisBottomNav({ active, counts = {}, className }: RelaisBottomNavProps) {
   const activeKey = useActiveKey(items, active);
   return (
     <nav
@@ -33,6 +36,7 @@ export function RelaisBottomNav({ active, className }: RelaisBottomNavProps) {
       <ul className="m-0 grid list-none grid-cols-4 p-0">
         {items.map(({ key, href, label, Icon }) => {
           const current = key === activeKey;
+          const count = counts[key] ?? 0;
           return (
             <li key={key} className="min-w-0">
               <Link
@@ -45,8 +49,22 @@ export function RelaisBottomNav({ active, className }: RelaisBottomNavProps) {
                     : "font-semibold text-muted hover:text-ink",
                 )}
               >
-                <Icon size={22} />
+                <span className="relative">
+                  <Icon size={22} />
+                  {count > 0 ? (
+                    <CountBadge
+                      count={count}
+                      aria-hidden="true"
+                      className="absolute -top-1.5 left-3.5 ring-2 ring-white"
+                    />
+                  ) : null}
+                </span>
                 {label}
+                {count > 0 ? (
+                  <span className="sr-only">
+                    , {count} {count > 1 ? "non lus" : "non lu"}
+                  </span>
+                ) : null}
               </Link>
             </li>
           );

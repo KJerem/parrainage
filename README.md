@@ -50,7 +50,7 @@ npm run dev        # API (port 4000) et web (port 3000)
 | `npm run dev` | compile les contrats puis lance, en parallèle, leur compilation continue, l'API et le web |
 | `npm run verify` | lint, vérification des types, tests et builds de tous les paquets (contrats, API, web) |
 | `npm run test` | tests unitaires (Vitest) |
-| `npm run test:e2e -w @parrainage/api` | tests e2e de l'API (services Docker démarrés) |
+| `npm run test:e2e -w @parrainage/api` | tests e2e de l'API (services Docker démarrés) ; rejoue le seed avant la suite, sans rien effacer d'autre |
 | `npm run test:e2e -w @parrainage/web` | tests Playwright du web : authentification et rôles, espace parrain, débordement horizontal (360 → 1440 px) et accessibilité (axe). **Remet à zéro la base de développement** (voir ci-dessous) |
 | `npm run format` | formatage (Prettier) |
 | `npm run db:migrate` / `db:seed` / `db:reset` / `db:studio` | base de données (Prisma) |
@@ -70,6 +70,8 @@ Les liens de connexion et de réinitialisation du mot de passe arrivent dans Mai
 
 Le seed crée aussi les contenus du design : nouvelles des relais, échanges Claire ↔ Aïcha, résultats scolaires (Aïcha : 11,8 puis 13,4 / 20), versements simulés depuis janvier 2024 et un vrai bulletin PDF déposé dans le stockage (sans stockage démarré, il reste un emplacement réservé). Les autres médias sont des emplacements réservés (`PLACEHOLDER`).
 
+Côté messagerie : Claire ↔ M. Koffi (demande d'appel, puis « Créneau proposé pour l'appel »), Paul ↔ M. Koffi, Hélène ↔ M. Koffi, M. Koffi ↔ bureau (« Reçus d'octobre ») et la lettre d'information du bureau à Claire. Claire a **2 messages non lus** (le message d'Aïcha d'hier et le créneau proposé par M. Koffi), M. Koffi **1** (la demande de Claire).
+
 **Horloge de démonstration.** L'API calcule ses dates à partir d'`APP_NOW` (instant ISO 8601, dans `apps/api/.env`) quand il est défini, sinon de l'heure réelle ; le seed part de `SEED_TODAY`, sinon du jour d'`APP_NOW`, sinon d'aujourd'hui. Avec `APP_NOW=2026-10-31T10:00:00Z` puis `npm run db:seed`, l'espace parrain reproduit la maquette.
 
 ## Authentification
@@ -81,6 +83,14 @@ Le seed crée aussi les contenus du design : nouvelles des relais, échanges Cla
 - **Déconnexion** : formulaire `POST /deconnexion` (sans JavaScript), qui révoque la session côté API puis efface les cookies.
 - Les connexions, liens et réinitialisations passent par le client Better Auth **dans le navigateur** (`/api/auth/*` réécrit vers l'API), pour que le cookie de session soit posé sur l'origine du web.
 
+## Messagerie et fichiers joints
+
+- **Modération** : un message à un enfant part en relecture (`PENDING`, avec les alertes du détecteur `detectAlerts` de `@parrainage/contracts`) et n'est remis qu'une fois approuvé ; entre adultes, il est remis aussitôt. Aucun e-mail ne contient le texte d'un message : seulement un lien vers la page Messages.
+- **Envoi d'un fichier** : `POST /api/uploads` renvoie une URL présignée (PUT simple jusqu'à 5 Mo, multipart par parts de 5 Mo au-delà, reprenable via `GET /api/uploads/:id/parts`) ; le navigateur dépose le fichier **directement dans le stockage**, puis `POST /api/uploads/:id/complete` vérifie le contenu réel (magic bytes), retire les métadonnées (EXIF et GPS, lieu des vidéos, auteur des PDF) et rend le média joignable. Plafonds : `UPLOAD_MAX_PHOTO_MB`, `UPLOAD_MAX_VIDEO_MB`, `UPLOAD_MAX_DOC_MB`, `VIDEO_MAX_SECONDS` (`apps/api/.env`).
+- **CORS du stockage** : les origines autorisées sont lues par docker compose dans `S3_CORS_ORIGINS` (`.env` racine : 3000 et 3100 pour les tests). Après un changement, `docker compose up -d storage` recrée le conteneur (les fichiers sont conservés).
+- **Limite d'envoi** : `MESSAGE_RATE_LIMIT_MAX` messages par `MESSAGE_RATE_LIMIT_WINDOW_SECONDS` et par utilisateur (429 au-delà). Le seed remet ces compteurs à zéro pour les comptes de démonstration.
+- **Côté web** (`apps/web/src/components/messaging`, `src/lib/upload.ts`) : `/parrain/messages` et `/relais/messages?onglet=parrains|bureau` (liste et conversation la plus récente à partir de md, liste seule en dessous), `/…/messages/[id]` pour une conversation. Les photos sont compressées dans le navigateur (`browser-image-compression` : 1 600 px, 1 Mo, EXIF retiré) avant l'envoi ; un envoi multipart interrompu reprend au nouvel essai (état gardé en `sessionStorage`, seules les parts manquantes repartent). Le message vidéo utilise `MediaRecorder` (mp4 si le navigateur sait l'enregistrer, sinon webm ; 2 minutes, environ 1 Mb/s). Avant l'envoi à un enfant, le détecteur prévient quand le texte semble contenir des coordonnées ; le message reste envoyable.
+
 ## Tests de bout en bout du web
 
 `npm run test:e2e -w @parrainage/web` construit puis lance l'API (port 4100) et le web (port 3100), à côté d'un éventuel `npm run dev` (3000 et 4000). Les services Docker doivent tourner (PostgreSQL et Mailpit).
@@ -89,6 +99,7 @@ Le seed crée aussi les contenus du design : nouvelles des relais, échanges Cla
 - `E2E_DB=reset` efface d'abord la base (`npm run db:reset`) pour repartir de zéro.
 - Horloge figée sur le jour du design (`apps/web/e2e/clock.ts`) : l'API de test démarre avec `APP_NOW=2026-10-31T10:00:00Z` et le seed est rejoué avec `SEED_TODAY=2026-10-31`. Après la suite, les dates de la base de développement partent donc du 31 octobre 2026 ; `npm run db:seed` les recale sur aujourd'hui.
 - `E2E_PORT` et `E2E_API_PORT` changent les ports si 3100 ou 4100 sont pris.
+- `e2e/messaging.spec.ts` rejoue le seed avant chaque projet (non-lus de la maquette) et préfixe ses clés d'envoi par `e2e-` : le seed supprime ces messages au lancement suivant. La caméra et le micro sont simulés par Chromium (`--use-fake-device-for-media-stream`).
 - Le build du web est construit pour l'origine des tests (`NEXT_PUBLIC_APP_URL=http://localhost:3100`) : relancez `npm run build` avant un `npm run start` sur le port 3000.
 
 ## Branches

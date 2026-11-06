@@ -23,3 +23,4 @@ export {
   type RelaisBottomNavKey,
   type RelaisBottomNavProps,
 } from "./relais-bottom-nav";
+export { RelaisMobileTop } from "./relais-mobile-top";

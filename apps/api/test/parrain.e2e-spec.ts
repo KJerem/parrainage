@@ -209,7 +209,8 @@ describe("Espace parrain et médias (e2e)", () => {
       );
       const summary = (feed: FeedItem[]) =>
         feed.map((item) => (item.type === "news" ? `news:${item.title}` : `message:${item.body}`));
-      expect(summary(claire.feed)).toEqual([
+      // L'ordre suit les dates du seed : seul compte ici ce que chacun voit.
+      expect(summary(claire.feed).sort()).toEqual([
         "message:Merci pour le ballon !",
         "news:Fin des vacances",
       ]);

@@ -1,10 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
-import { test as base, expect, request } from "@playwright/test";
+import { test as base, expect, request, type WorkerInfo } from "@playwright/test";
 
 // Comptes du seed (apps/api/prisma/seed/data.ts), mot de passe commun « motdepasse ».
 export const PASSWORD = "motdepasse";
 export const CLAIRE = "claire.m@exemple.fr";
+export const KOFFI = "koffi@relais.exemple.tg";
+export const PAUL = "paul.d@exemple.fr";
 
 /**
  * Ouvre une session comme le formulaire de connexion (POST /api/auth/sign-in/email, avec
@@ -27,28 +29,49 @@ export async function saveSession(baseURL: string, email: string, file: string):
 }
 
 /**
- * Tests de l'espace parrain : Claire se connecte une fois par projet et par exécution (le
- * dossier test-results est vidé au lancement), loin de la limite de 5 essais par minute ;
- * les workers suivants et chaque test réutilisent sa session.
+ * Session d'un compte du seed, ouverte une fois par projet et par exécution (le dossier
+ * test-results est vidé au lancement), loin de la limite de 5 essais par minute : les workers
+ * suivants et chaque test la réutilisent.
  */
-export const test = base.extend<object, { claireState: string }>({
+async function workerSession(email: string, slug: string, workerInfo: WorkerInfo) {
+  const { baseURL } = workerInfo.project.use;
+  if (!baseURL) {
+    throw new Error("baseURL manquante dans playwright.config.ts");
+  }
+  const file = path.join(
+    workerInfo.project.outputDir,
+    ".auth",
+    `${slug}-${workerInfo.project.name}.json`,
+  );
+  return fs.existsSync(file) ? file : saveSession(baseURL, email, file);
+}
+
+type Sessions = { claireState: string; koffiState: string; paulState: string };
+
+// Second argument nommé `provide` (et non `use`) : la règle des hooks React le confondrait.
+const sessions = base.extend<object, Sessions>({
   claireState: [
-    // Second argument nommé `provide` (et non `use`) : la règle des hooks React le confondrait.
-    async ({}, provide, workerInfo) => {
-      const { baseURL } = workerInfo.project.use;
-      if (!baseURL) {
-        throw new Error("baseURL manquante dans playwright.config.ts");
-      }
-      const file = path.join(
-        workerInfo.project.outputDir,
-        ".auth",
-        `claire-${workerInfo.project.name}.json`,
-      );
-      await provide(fs.existsSync(file) ? file : await saveSession(baseURL, CLAIRE, file));
-    },
+    async ({}, provide, workerInfo) => provide(await workerSession(CLAIRE, "claire", workerInfo)),
     { scope: "worker" },
   ],
+  koffiState: [
+    async ({}, provide, workerInfo) => provide(await workerSession(KOFFI, "koffi", workerInfo)),
+    { scope: "worker" },
+  ],
+  paulState: [
+    async ({}, provide, workerInfo) => provide(await workerSession(PAUL, "paul", workerInfo)),
+    { scope: "worker" },
+  ],
+});
+
+/** Tests de l'espace parrain : la page est ouverte avec la session de Claire. */
+export const test = sessions.extend({
   storageState: ({ claireState }, provide) => provide(claireState),
+});
+
+/** Tests de l'espace relais : la page est ouverte avec la session de M. Koffi. */
+export const relaisTest = sessions.extend({
+  storageState: ({ koffiState }, provide) => provide(koffiState),
 });
 
 export { expect };
