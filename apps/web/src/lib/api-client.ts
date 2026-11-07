@@ -27,7 +27,7 @@ function fallbackMessage(status: number): string {
 }
 
 export type ApiFetchOptions = {
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "PUT" | "DELETE";
   /** Corps JSON. */
   body?: unknown;
   signal?: AbortSignal;

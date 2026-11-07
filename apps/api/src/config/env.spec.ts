@@ -21,8 +21,30 @@ describe("validateEnv", () => {
       validateEnv({ ...base, NODE_ENV: "production", BETTER_AUTH_SECRET: exampleSecret }),
     ).toThrow(/secret d'exemple est interdit en production/);
     expect(
-      validateEnv({ ...base, NODE_ENV: "production", BETTER_AUTH_SECRET: "x".repeat(44) }).NODE_ENV,
+      validateEnv({
+        ...base,
+        NODE_ENV: "production",
+        BETTER_AUTH_SECRET: "x".repeat(44),
+        CHILD_CODE_PEPPER: "y".repeat(44),
+      }).NODE_ENV,
     ).toBe("production");
+  });
+
+  it("exige en production un vrai poivre pour le code des enfants", () => {
+    expect(() =>
+      validateEnv({ ...base, NODE_ENV: "production", BETTER_AUTH_SECRET: "x".repeat(44) }),
+    ).toThrow(/CHILD_CODE_PEPPER : le secret d'exemple est interdit en production/);
+    const dev = { ...base, BETTER_AUTH_SECRET: exampleSecret };
+    expect(validateEnv(dev).CHILD_CODE_PEPPER.length).toBeGreaterThanOrEqual(32);
+    expect(() => validateEnv({ ...dev, CHILD_CODE_PEPPER: "court" })).toThrow(
+      /au moins 32 caractères/,
+    );
+  });
+
+  it("garde les tâches planifiées actives, sauf si on les coupe", () => {
+    const dev = { ...base, BETTER_AUTH_SECRET: exampleSecret };
+    expect(validateEnv(dev).SCHEDULER_ENABLED).toBe(true);
+    expect(validateEnv({ ...dev, SCHEDULER_ENABLED: "false" }).SCHEDULER_ENABLED).toBe(false);
   });
 
   it("exige un secret d'au moins 32 caractères", () => {

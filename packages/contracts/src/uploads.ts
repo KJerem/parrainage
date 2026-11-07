@@ -46,7 +46,10 @@ export function uploadPartCount(sizeBytes: number): number {
 
 const id = z.string().min(1);
 
-export const uploadPurposeSchema = z.enum(["message"]);
+/** Usage d'un fichier : un message, une nouvelle, le dossier d'un enfant, un bulletin. */
+export const uploadPurposeSchema = z.enum(["message", "news", "child", "result"]);
+
+export type UploadPurpose = z.infer<typeof uploadPurposeSchema>;
 
 /** POST /api/uploads. Le nom du fichier n'est jamais conservé ni montré aux destinataires. */
 export const createUploadSchema = z.object({

@@ -73,7 +73,7 @@ describe("prepareFile", () => {
     const compress = vi.fn(async () => new Blob(["jpeg"], { type: "image/jpeg" }));
     const file = new File(["original"], "IMG_0001.HEIC.jpg", { type: "image/jpeg" });
     const result = await prepareFile(file, { compress });
-    expect(compress).toHaveBeenCalledWith(file, "image/jpeg");
+    expect(compress).toHaveBeenCalledWith(file, "image/jpeg", undefined);
     expect(result).toMatchObject({
       kind: "PHOTO",
       mimeType: "image/jpeg",

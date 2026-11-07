@@ -39,8 +39,4 @@ export function birthDateForAge(today: Date, age: number, extraDays: number): Da
 }
 
 /** Année scolaire togolaise (rentrée en septembre) : « 2026-2027 ». */
-export function schoolYearOf(today: Date): string {
-  const year = today.getUTCFullYear();
-  const start = today.getUTCMonth() >= 8 ? year : year - 1;
-  return `${start}-${start + 1}`;
-}
+export { schoolYearOf } from "@parrainage/contracts";

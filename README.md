@@ -70,6 +70,8 @@ Les liens de connexion et de réinitialisation du mot de passe arrivent dans Mai
 
 Le seed crée aussi les contenus du design : nouvelles des relais, échanges Claire ↔ Aïcha, résultats scolaires (Aïcha : 11,8 puis 13,4 / 20), versements simulés depuis janvier 2024 et un vrai bulletin PDF déposé dans le stockage (sans stockage démarré, il reste un emplacement réservé). Les autres médias sont des emplacements réservés (`PLACEHOLDER`).
 
+Côté relais : chez M. Koffi, **7 bulletins du 1er trimestre à saisir** (dont Esther, Yao et Mariam), 12 enfants à l'EPP Bè et le code image d'Aïcha (Soleil, Arbre, Poisson).
+
 Côté modération : **12 messages en attente**, dont 3 avec un média (Paul → Kofi avec un numéro WhatsApp fictif, Mariam → Hélène avec une vidéo signalée, Aïcha → Claire avec une page de bulletin, Yao → Marc, et 8 messages des binômes de Kara et Kpalimé). L'historique de Paul ↔ Kofi compte 23 messages, dont 1 retenu en mars 2025.
 
 Côté messagerie : Claire ↔ M. Koffi (demande d'appel, puis « Créneau proposé pour l'appel »), Paul ↔ M. Koffi, Hélène ↔ M. Koffi, M. Koffi ↔ bureau (« Reçus d'octobre ») et la lettre d'information du bureau à Claire. Claire a **2 messages non lus** (le message d'Aïcha d'hier et le créneau proposé par M. Koffi), M. Koffi **1** (la demande de Claire).
@@ -93,6 +95,18 @@ Côté messagerie : Claire ↔ M. Koffi (demande d'appel, puis « Créneau propo
 - **Limite d'envoi** : `MESSAGE_RATE_LIMIT_MAX` messages par `MESSAGE_RATE_LIMIT_WINDOW_SECONDS` et par utilisateur (429 au-delà). Le seed remet ces compteurs à zéro pour les comptes de démonstration.
 - **Côté web** (`apps/web/src/components/messaging`, `src/lib/upload.ts`) : `/parrain/messages` et `/relais/messages?onglet=parrains|bureau` (liste et conversation la plus récente à partir de md, liste seule en dessous), `/…/messages/[id]` pour une conversation. Les photos sont compressées dans le navigateur (`browser-image-compression` : 1 600 px, 1 Mo, EXIF retiré) avant l'envoi ; un envoi multipart interrompu reprend au nouvel essai (état gardé en `sessionStorage`, seules les parts manquantes repartent). Le message vidéo utilise `MediaRecorder` (mp4 si le navigateur sait l'enregistrer, sinon webm ; 2 minutes, environ 1 Mb/s). Avant l'envoi à un enfant, le détecteur prévient quand le texte semble contenir des coordonnées ; le message reste envoyable.
 
+## Espace relais
+
+Toutes les routes `/api/relais/*` sont bornées aux enfants du relais connecté : l'enfant d'un autre relais répond 404, et un parrain n'y apparaît que par son nom.
+
+- **Accueil** (`/relais`) : indicateurs calculés, enfants suivis (tableau à partir de md, cartes en dessous) et fraîcheur de la dernière nouvelle ou du dernier résultat envoyé (moins de 30 jours : vert ; jusqu'à 59 : ambre ; 60 et plus : rouge).
+- **Dossier d'un enfant** (`/relais/enfants/nouveau`, `/relais/enfants/[id]`) : un brouillon n'exige que l'identité ; l'envoi au bureau exige le dossier complet et l'accord de parrainage. Le consentement photos et vidéos reste facultatif : sans lui, le parrain lit le texte des nouvelles sans en voir les médias. Chaque accord donné ou retiré est tracé (`ConsentRecord`) et chaque modification auditée.
+- **Code image** : 3 images ordonnées parmi 6, tirées par le serveur et hachées en Argon2id avec le poivre `CHILD_CODE_PEPPER`. Il s'affiche une seule fois, sur une carte à imprimer, et ne peut ensuite qu'être remplacé. Le navigateur ne peut pas imposer un code : la proposition est signée.
+- **Nouvelles** (`/relais/publier`) : un enfant, plusieurs, ou « Vie du relais » (tous). Chaque parrain concerné reçoit un seul e-mail, avec un lien et sans le texte. Une publication rejouée (même clé) ne double rien.
+- **Publication programmée** : le planificateur (`@nestjs/schedule`, `SCHEDULER_ENABLED`) publie chaque minute les nouvelles dont l'heure est venue et purge chaque heure les fichiers sans usage. Une nouvelle programmée s'annule depuis la page de publication.
+- **Résultats** (`/relais/resultats?periode=&ecole=`) : une ligne par enfant, enregistrée d'elle-même 800 ms après la dernière frappe. Une donnée plus ancienne que l'enregistrée est refusée (409). Rien n'est visible des parrains avant « Envoyer aux parrains », et un résultat envoyé garde sa moyenne.
+- **Écoles** : ajoutées depuis le formulaire d'un enfant (`POST /api/relais/schools`).
+
 ## Modération
 
 Le bureau relit chaque message échangé avec un enfant, sur `/bureau` (file et approbation sur place) et `/bureau/moderation` (file et message relu).
@@ -113,7 +127,7 @@ Le bureau relit chaque message échangé avec un enfant, sur `/bureau` (file et 
 - `E2E_DB=reset` efface d'abord la base (`npm run db:reset`) pour repartir de zéro.
 - Horloge figée sur le jour du design (`apps/web/e2e/clock.ts`) : l'API de test démarre avec `APP_NOW=2026-10-31T10:00:00Z` et le seed est rejoué avec `SEED_TODAY=2026-10-31`. Après la suite, les dates de la base de développement partent donc du 31 octobre 2026 ; `npm run db:seed` les recale sur aujourd'hui.
 - `E2E_PORT` et `E2E_API_PORT` changent les ports si 3100 ou 4100 sont pris.
-- `e2e/moderation.spec.ts` prend de vraies décisions : il rejoue le seed avant et après chaque projet.
+- `e2e/moderation.spec.ts` et `e2e/relais.spec.ts` écrivent vraiment : ils rejouent le seed avant et après chaque projet. Ce que les tests créent porte un marqueur (enfants et écoles « E2e… », clés « e2e-… ») : le seed le retire.
 - `e2e/messaging.spec.ts` rejoue le seed avant chaque projet (non-lus de la maquette) et préfixe ses clés d'envoi par `e2e-` : le seed supprime ces messages au lancement suivant. La caméra et le micro sont simulés par Chromium (`--use-fake-device-for-media-stream`).
 - Le build du web est construit pour l'origine des tests (`NEXT_PUBLIC_APP_URL=http://localhost:3100`) : relancez `npm run build` avant un `npm run start` sur le port 3000.
 

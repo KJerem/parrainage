@@ -2,50 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { ComingSoon } from "@/components/layout/coming-soon";
-import {
-  BellIcon,
-  FileLinesIcon,
-  SendIcon,
-  UserIcon,
-  UserPlusIcon,
-  UsersIcon,
-} from "@/components/ui";
+import { BellIcon, UserIcon, UsersIcon } from "@/components/ui";
 import { requireRole } from "@/lib/auth.server";
 
 /** Rubriques de la navigation du relais qui ne sont pas encore livrées. */
 const rubriques = new Map<string, { title: string; description: string; icon: ReactNode }>([
-  [
-    "enfants",
-    {
-      title: "Enfants",
-      description: "La liste des enfants que vous suivez s'affichera bientôt ici.",
-      icon: <UsersIcon size={26} />,
-    },
-  ],
-  [
-    "enfants/nouveau",
-    {
-      title: "Ajouter un enfant",
-      description: "Vous pourrez bientôt créer ici le dossier d'un nouvel enfant.",
-      icon: <UserPlusIcon size={26} />,
-    },
-  ],
-  [
-    "publier",
-    {
-      title: "Publier une nouvelle",
-      description: "Vous pourrez bientôt publier ici des nouvelles pour les parrains.",
-      icon: <SendIcon size={26} />,
-    },
-  ],
-  [
-    "resultats",
-    {
-      title: "Résultats scolaires",
-      description: "Vous pourrez bientôt saisir ici les résultats et les bulletins des enfants.",
-      icon: <FileLinesIcon size={26} />,
-    },
-  ],
   [
     "sessions",
     {

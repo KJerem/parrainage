@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import type { Browser, Page, TestInfo } from "@playwright/test";
 import ffmpegPath from "ffmpeg-static";
 import sharp from "sharp";
-import { expect, test } from "./fixtures";
+import { expect, test, withE2eKeys } from "./fixtures";
 import { reseed } from "./global-setup";
 import {
   AICHA,
@@ -39,20 +39,6 @@ test.beforeEach(({}, testInfo) => {
 });
 
 const isMobile = () => test.info().project.name === "mobile-390";
-
-/**
- * Clés d'idempotence préfixées « e2e- » : le seed supprime ces messages au lancement suivant
- * (les non-lus de la maquette restent ceux du seed).
- */
-async function withE2eKeys(page: Page) {
-  await page.addInitScript(() => {
-    const original = crypto.randomUUID.bind(crypto);
-    Object.defineProperty(crypto, "randomUUID", {
-      configurable: true,
-      value: () => `e2e-${original()}`,
-    });
-  });
-}
 
 /** Nouvelle fenêtre avec la session donnée, aux dimensions du projet courant. */
 async function openAs(browser: Browser, testInfo: TestInfo, storageState: string) {

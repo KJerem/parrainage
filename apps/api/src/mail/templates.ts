@@ -137,3 +137,47 @@ export function messageMaskedEmail(notice: ModerationNotice): MailContent {
     notes: noticeNotes(notice),
   });
 }
+
+/** Nouvelle du relais : le lien mène au fil, aucune ligne de la nouvelle. */
+export function newsPublishedEmail(url: string): MailContent {
+  return linkEmail({
+    subject: "Une nouvelle de votre relais sur Parrainage LRT",
+    intro: "Le relais qui suit votre filleul a publié une nouvelle sur la plateforme.",
+    action: "Lire la nouvelle",
+    url,
+    notes: ["Connectez-vous à votre espace pour la découvrir."],
+  });
+}
+
+/** Nouvelle adressée au bureau. */
+export function newsPublishedBureauEmail(url: string): MailContent {
+  return linkEmail({
+    subject: "Un relais a publié une nouvelle",
+    intro: "Un relais a publié une nouvelle et vous a mis parmi ses destinataires.",
+    action: "Ouvrir mon espace",
+    url,
+    notes: [],
+  });
+}
+
+/** Résultats envoyés : aucune note ni appréciation dans l'e-mail. */
+export function resultsSentEmail(url: string): MailContent {
+  return linkEmail({
+    subject: "De nouveaux résultats scolaires sur Parrainage LRT",
+    intro: "Le relais qui suit votre filleul a envoyé de nouveaux résultats scolaires.",
+    action: "Voir les résultats",
+    url,
+    notes: ["Connectez-vous à votre espace pour les consulter."],
+  });
+}
+
+/** Dossier d'enfant envoyé au bureau : aucune donnée de l'enfant dans l'e-mail. */
+export function childSubmittedEmail(url: string): MailContent {
+  return linkEmail({
+    subject: "Un dossier d'enfant à vérifier",
+    intro: "Un relais vient d'envoyer le dossier d'un enfant au bureau.",
+    action: "Ouvrir mon espace",
+    url,
+    notes: ["Vérifiez le dossier avant de proposer un parrain."],
+  });
+}

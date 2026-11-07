@@ -4,6 +4,7 @@ import { hashPassword } from "better-auth/crypto";
 import { getEnv } from "../src/config/env.js";
 import type { Prisma } from "../src/generated/prisma/client.js";
 import { prisma } from "../src/prisma/client.js";
+import { hashChildCode } from "../src/relais/child-code.js";
 import { createS3Client } from "../src/storage/s3-client.js";
 import { buildSeedContent, type SeedContent, type SeedUpload } from "./seed/content.js";
 import { buildSeedData, type SeedUser } from "./seed/data.js";
@@ -131,6 +132,32 @@ async function seedContent(content: SeedContent): Promise<{ uploaded: number }> 
     await prisma.media.deleteMany({ where: { messageId: { in: ids } } });
     await prisma.message.deleteMany({ where: { id: { in: ids } } });
   }
+
+  // Ce que les tests web ont créé : enfants et écoles au nom « E2e… », nouvelles à clé « e2e-… ».
+  const testChildren = { firstName: { startsWith: "E2e" } };
+  await prisma.schoolResult.deleteMany({ where: { child: testChildren } });
+  await prisma.child.deleteMany({ where: testChildren });
+  await prisma.school.deleteMany({ where: { shortName: { startsWith: "E2e" } } });
+  const testNews = { idempotencyKey: { contains: ":e2e-" } };
+  await prisma.media.deleteMany({ where: { newsPost: testNews } });
+  await prisma.newsPost.deleteMany({ where: testNews });
+
+  await prisma.consentRecord.deleteMany({ where: stale(content.consents.map((c) => c.id)) });
+  await inBatches(content.consents, ({ id, ...fields }) =>
+    prisma.consentRecord.upsert({
+      where: { id },
+      update: { ...fields, withdrawnAt: null },
+      create: { id, ...fields },
+    }),
+  );
+  // Code image d'Aïcha, celui du design : les autres enfants l'obtiennent par leur relais.
+  await prisma.child.update({
+    where: { id: "seed-child-aicha" },
+    data: {
+      codeHash: await hashChildCode(["SOLEIL", "ARBRE", "POISSON"], getEnv().CHILD_CODE_PEPPER),
+      codeSetAt: today,
+    },
+  });
 
   await prisma.media.deleteMany({ where: stale(media.map((m) => m.id)) });
   await prisma.message.deleteMany({ where: stale(content.messages.map((m) => m.id)) });

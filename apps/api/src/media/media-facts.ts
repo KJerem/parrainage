@@ -34,11 +34,13 @@ export const mediaFactsSelect = {
     select: {
       status: true,
       relaisId: true,
+      notifyParrains: true,
       children: { select: { child: { select: childFactsSelect } } },
     },
   },
   schoolResult: { select: { status: true, child: { select: childFactsSelect } } },
   avatarOf: { select: childFactsSelect },
+  consentOf: { select: childFactsSelect },
 } as const satisfies Prisma.MediaSelect;
 
 export type MediaFactsRow = Prisma.MediaGetPayload<{ select: typeof mediaFactsSelect }>;
@@ -76,6 +78,7 @@ export function toMediaFacts(row: MediaFactsRow): MediaFacts {
       ? {
           status: row.newsPost.status,
           relaisId: row.newsPost.relaisId,
+          notifyParrains: row.newsPost.notifyParrains,
           children: row.newsPost.children.map((c) => toChildFacts(c.child)),
         }
       : null,
@@ -83,6 +86,7 @@ export function toMediaFacts(row: MediaFactsRow): MediaFacts {
       ? { status: row.schoolResult.status, child: toChildFacts(row.schoolResult.child) }
       : null,
     avatarOf: row.avatarOf ? toChildFacts(row.avatarOf) : null,
+    consentOf: row.consentOf ? toChildFacts(row.consentOf) : null,
   };
 }
 

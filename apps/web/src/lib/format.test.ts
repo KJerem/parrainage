@@ -17,6 +17,7 @@ import {
   formatRank,
   formatReceived,
   formatRelativeDay,
+  formatWeekdayDate,
   RELAIS_TIME_ZONE,
 } from "./format";
 
@@ -187,5 +188,12 @@ describe("formatElapsed, formatReceived et formatDaysAgo", () => {
     expect(formatDaysAgo("2026-08-28T09:00:00Z", now)).toBe("il y a 64 jours");
     expect(formatDaysAgo("2026-10-30T09:00:00Z", now)).toBe("hier");
     expect(formatDaysAgo("2026-10-31T09:00:00Z", now)).toBe("aujourd'hui");
+  });
+});
+
+describe("formatWeekdayDate", () => {
+  it("écrit le jour et la date, dans le fuseau demandé", () => {
+    expect(formatWeekdayDate("2026-10-31T10:00:00Z", RELAIS_TIME_ZONE)).toBe("Samedi 31 octobre");
+    expect(formatWeekdayDate("2026-10-31T23:30:00Z")).toBe("Dimanche 1 novembre");
   });
 });

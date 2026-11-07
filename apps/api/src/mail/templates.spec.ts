@@ -1,9 +1,13 @@
 import {
+  childSubmittedEmail,
   magicLinkEmail,
   messageHeldEmail,
   messageMaskedEmail,
   newMessageEmail,
+  newsPublishedBureauEmail,
+  newsPublishedEmail,
   resetPasswordEmail,
+  resultsSentEmail,
 } from "./templates.js";
 
 const url = "http://localhost:3000/api/auth/magic-link/verify?token=abc&callbackURL=%2Fparrain";
@@ -68,6 +72,19 @@ describe("modèles d'e-mail", () => {
       expect(mail.text).not.toContain("Motif");
       expect(mail.text).toContain("écrivez à l'association");
     });
+  });
+
+  it.each([
+    ["nouvelle", newsPublishedEmail, "Une nouvelle de votre relais sur Parrainage LRT"],
+    ["nouvelle au bureau", newsPublishedBureauEmail, "Un relais a publié une nouvelle"],
+    ["résultats", resultsSentEmail, "De nouveaux résultats scolaires sur Parrainage LRT"],
+    ["dossier", childSubmittedEmail, "Un dossier d'enfant à vérifier"],
+  ])("%s : un sujet et un lien, rien de plus", (_, build, subject) => {
+    const link = "http://localhost:3000/parrain";
+    const mail = build(link);
+    expect(mail.subject).toBe(subject);
+    expect(mail.text).toContain(link);
+    expect(mail.html).toContain(link);
   });
 
   it("échappe un lien piégé", () => {

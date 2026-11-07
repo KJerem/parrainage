@@ -3,6 +3,7 @@ import {
   type Role,
   type UploadKind,
   uploadMimeTypes,
+  type UploadPurpose,
 } from "@parrainage/contracts";
 import { AppError } from "../common/app-error.js";
 import type { Env } from "../config/env.js";
@@ -32,8 +33,13 @@ export function uploadLimitsFrom(
   };
 }
 
-/** Rôles qui peuvent joindre un fichier à un message (le bureau écrira en phase ultérieure). */
-const MESSAGE_UPLOADERS: readonly Role[] = ["parrain", "relais"];
+/** Qui peut envoyer un fichier, selon son usage (le bureau écrira en phase ultérieure). */
+const UPLOADERS: Readonly<Record<UploadPurpose, readonly Role[]>> = {
+  message: ["parrain", "relais"],
+  news: ["relais"],
+  child: ["relais"],
+  result: ["relais"],
+};
 
 const KIND_LABELS: Readonly<Record<UploadKind, string>> = {
   PHOTO: "une photo",
@@ -61,8 +67,13 @@ export function tooLongMessage(maxSeconds: number): string {
 
 /** Contrôles de POST /api/uploads, avant tout appel au stockage. */
 export function validateUploadRequest(input: CreateUpload, role: Role, limits: UploadLimits): void {
-  if (input.purpose === "message" && !MESSAGE_UPLOADERS.includes(role)) {
-    throw new AppError(403, "Vous ne pouvez pas joindre de fichier à un message");
+  if (!UPLOADERS[input.purpose].includes(role)) {
+    throw new AppError(
+      403,
+      input.purpose === "message"
+        ? "Vous ne pouvez pas joindre de fichier à un message"
+        : "Vous ne pouvez pas envoyer ce fichier",
+    );
   }
   if (!uploadMimeTypes[input.kind].includes(input.mimeType)) {
     throw new AppError(422, TYPE_REJECTED_MESSAGE, { mimeType: [TYPE_REJECTED_MESSAGE] });

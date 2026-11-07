@@ -34,11 +34,15 @@ export interface MediaFacts {
   newsPost: {
     status: NewsPostStatus;
     relaisId: string;
+    /** La nouvelle s'adresse aux parrains (case « Les parrains concernés »). */
+    notifyParrains: boolean;
     children: readonly MediaChildFacts[];
   } | null;
   schoolResult: { status: SchoolResultStatus; child: MediaChildFacts } | null;
   /** Photo de profil d'un enfant. */
   avatarOf: MediaChildFacts | null;
+  /** Autorisation signée du responsable : jamais montrée à un parrain. */
+  consentOf: MediaChildFacts | null;
 }
 
 /** Statuts de modération qui rendent un message visible par ses destinataires. */
@@ -72,6 +76,7 @@ function parrainCanView(parrainId: string, media: MediaFacts): boolean {
   }
   if (
     newsPost?.status === "PUBLISHED" &&
+    newsPost.notifyParrains &&
     newsPost.children.some((c) => sponsorsWithConsent(c, parrainId))
   ) {
     return true;
@@ -84,8 +89,9 @@ function parrainCanView(parrainId: string, media: MediaFacts): boolean {
 }
 
 function relaisCanView(relaisId: string, media: MediaFacts): boolean {
-  const { message, newsPost, schoolResult, avatarOf } = media;
+  const { message, newsPost, schoolResult, avatarOf, consentOf } = media;
   return (
+    consentOf?.relaisId === relaisId ||
     (message !== null && isDelivered(message) && message.relaisIds.includes(relaisId)) ||
     newsPost?.relaisId === relaisId ||
     newsPost?.children.some((c) => c.relaisId === relaisId) === true ||
@@ -127,6 +133,7 @@ export function canViewMedia(actor: MediaActor, media: MediaFacts): boolean {
 export function isChildMedia(media: MediaFacts): boolean {
   return (
     media.avatarOf !== null ||
+    media.consentOf !== null ||
     media.schoolResult !== null ||
     (media.newsPost?.children.length ?? 0) > 0 ||
     (media.message !== null &&

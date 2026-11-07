@@ -12,6 +12,8 @@ import { MessagingModule } from "./messaging/messaging.module.js";
 import { ModerationModule } from "./moderation/moderation.module.js";
 import { ParrainModule } from "./parrain/parrain.module.js";
 import { PrismaModule } from "./prisma/prisma.module.js";
+import { RelaisModule } from "./relais/relais.module.js";
+import { SchedulerModule } from "./scheduler/scheduler.module.js";
 import { StorageModule } from "./storage/storage.module.js";
 import { UploadsModule } from "./uploads/uploads.module.js";
 
@@ -38,6 +40,8 @@ import { UploadsModule } from "./uploads/uploads.module.js";
     UploadsModule,
     MessagingModule,
     ModerationModule,
+    RelaisModule,
+    SchedulerModule,
   ],
 })
 export class AppModule {}

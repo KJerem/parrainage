@@ -169,6 +169,18 @@ export function formatRelativeDay(
   return formatDayMonth(at, { month, withYear, timeZone });
 }
 
+/** Jour de la semaine et date : « Samedi 31 octobre ». */
+export function formatWeekdayDate(date: Date | string, timeZone = PARRAIN_TIME_ZONE): string {
+  return capitalize(
+    new Intl.DateTimeFormat(LOCALE, {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      timeZone,
+    }).format(new Date(date)),
+  );
+}
+
 /** Ancienneté courte : « 35 min », « 5 h », « 2 j » (jamais négative). */
 export function formatElapsed(date: Date | string, now: Date | string): string {
   const elapsed = new Date(now).getTime() - new Date(date).getTime();

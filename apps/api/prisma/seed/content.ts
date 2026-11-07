@@ -3,6 +3,7 @@
 import {
   type AlertSpan,
   type AlertType,
+  CONSENT_TEXT_VERSION,
   detectAlerts,
   type ManualFlag,
   moderationReasonLabels,
@@ -126,6 +127,15 @@ export interface SeedMedia {
   createdAt: Date;
 }
 
+export interface SeedConsent {
+  id: string;
+  childId: string;
+  type: "SPONSORSHIP" | "MEDIA";
+  textVersion: string;
+  recordedById: string;
+  grantedAt: Date;
+}
+
 export interface SeedPayment {
   id: string;
   parrainId: string;
@@ -154,6 +164,7 @@ export interface SeedContent {
   periods: SeedPeriod[];
   results: SeedResult[];
   news: SeedNews[];
+  consents: SeedConsent[];
   conversations: SeedConversation[];
   messages: SeedMessage[];
   media: SeedMedia[];
@@ -240,6 +251,19 @@ const NEWS_TEMPLATES: readonly ((child: SeedChild) => { title: string; body: str
     title: "Nouvel uniforme",
     body: `${c.firstName} a reçu un nouvel uniforme grâce à votre parrainage. ${pronoun(c.gender)} vous dit merci !`,
   }),
+];
+
+/** Enfants de M. Koffi dont les résultats du 1er trimestre sont déjà envoyés. */
+const T1_ALREADY_SENT = [
+  "koffi-1",
+  "koffi-2",
+  "koffi-3",
+  "koffi-5",
+  "koffi-6",
+  "koffi-7",
+  "koffi-8",
+  "koffi-10",
+  "koffi-12",
 ];
 
 /** Échanges relus de Paul et Kofi, en alternance (Paul écrit le premier). */
@@ -383,6 +407,23 @@ export function buildSeedContent(today: Date, data: SeedData): SeedContent {
           enteredById: koffiUserId,
           sentAt: null,
           clientUpdatedAt: at(ago(2), 14, 20),
+        };
+      }
+      // « Saisir 7 bulletins du T1 » : M. Koffi a déjà envoyé les résultats de 9 autres enfants,
+      // ceux qui ont aussi des nouvelles récentes (les 5 sans nouvelle le restent).
+      const sentIndex = T1_ALREADY_SENT.indexOf(c.id.replace("seed-child-", ""));
+      if (sentIndex >= 0) {
+        const sentAt = at(ago(3 + sentIndex), 15);
+        return {
+          ...base,
+          averageX100: 1000 + sentIndex * 45,
+          rank: 4 + sentIndex * 2,
+          classSize: 44,
+          appreciation: "Bon trimestre, continue tes efforts.",
+          status: "SENT",
+          enteredById: koffiUserId,
+          sentAt,
+          clientUpdatedAt: sentAt,
         };
       }
       return {
@@ -1118,10 +1159,28 @@ export function buildSeedContent(today: Date, data: SeedData): SeedContent {
     periodKey: null,
   });
 
+  // Accords recueillis par le relais à l'ouverture de chaque dossier.
+  const consents: SeedConsent[] = data.children.flatMap((c) => {
+    const grantedAt = c.submittedAt ?? today;
+    const record = (type: SeedConsent["type"]): SeedConsent => ({
+      id: `seed-consent-${slugOf(c.id)}-${type.toLowerCase()}`,
+      childId: c.id,
+      type,
+      textVersion: CONSENT_TEXT_VERSION,
+      recordedById: c.createdById,
+      grantedAt,
+    });
+    return [
+      ...(c.consentSponsorship ? [record("SPONSORSHIP")] : []),
+      ...(c.consentMedia ? [record("MEDIA")] : []),
+    ];
+  });
+
   return {
     periods,
     results,
     news,
+    consents,
     conversations,
     messages,
     media,

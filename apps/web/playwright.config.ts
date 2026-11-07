@@ -34,7 +34,12 @@ export default defineConfig({
       cwd: path.join(__dirname, "..", "api"),
       url: `${apiURL}/api/health?light`,
       // APP_NOW : horloge figée sur le jour du design, le même que celui du seed (e2e/clock.ts).
-      env: { PORT: String(apiPort), APP_URL: baseURL, APP_NOW: E2E_APP_NOW },
+      env: {
+        PORT: String(apiPort),
+        APP_URL: baseURL,
+        APP_NOW: E2E_APP_NOW,
+        SCHEDULER_ENABLED: "false",
+      },
       // Une API déjà lancée sur ce port ferait confiance à une autre origine : jamais réutilisée.
       reuseExistingServer: false,
       timeout: 180_000,

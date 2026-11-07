@@ -49,6 +49,7 @@ model User {
   messages         Message[]                 @relation("MessageAuthor")
   reviewedMessages Message[]                 @relation("MessageReviewer")
   enteredResults   SchoolResult[]            @relation("SchoolResultEnteredBy")
+  recordedConsents ConsentRecord[]           @relation("ConsentRecordedBy")
 
   @@unique([email])
   @@map("user")
@@ -228,6 +229,12 @@ model Child {
   /// Photo de profil (média AVATAR) : jamais montrée au parrain sans `consentMedia`.
   photoMediaId       String?         @unique
   photo              Media?          @relation("ChildPhoto", fields: [photoMediaId], references: [id], onDelete: SetNull)
+  /// Autorisation signée par le responsable : relais et bureau seulement.
+  consentDocumentId  String?         @unique
+  consentDocument    Media?          @relation("ChildConsentDocument", fields: [consentDocumentId], references: [id], onDelete: SetNull)
+  /// Code image haché (Argon2id, poivre CHILD_CODE_PEPPER) : montré une seule fois au relais.
+  codeHash           String?
+  codeSetAt          DateTime?
   submittedAt        DateTime?
   validatedAt        DateTime?
   createdAt          DateTime        @default(now())
@@ -240,10 +247,34 @@ model Child {
   messages      Message[]                 @relation("MessageAuthorChild")
   results       SchoolResult[]
   payments      Payment[]
+  consents      ConsentRecord[]
 
   @@index([relaisId, fileStatus])
   @@index([schoolId])
   @@index([createdById])
+}
+
+enum ConsentType {
+  SPONSORSHIP
+  MEDIA
+}
+
+/// Trace d'un accord du responsable légal : le texte accepté, sa date, qui l'a recueilli, son retrait.
+model ConsentRecord {
+  id           String      @id @default(cuid())
+  childId      String
+  child        Child       @relation(fields: [childId], references: [id], onDelete: Cascade)
+  type         ConsentType
+  /// Version du texte présenté au responsable.
+  textVersion  String
+  recordedById String?
+  recordedBy   User?       @relation("ConsentRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+  grantedAt    DateTime
+  withdrawnAt  DateTime?
+  createdAt    DateTime    @default(now())
+
+  @@index([childId, type])
+  @@index([recordedById])
 }
 
 // ─── Binômes ──────────────────────────────────────────────────────────────────
@@ -322,7 +353,8 @@ model Media {
   position         Int           @default(0)
   createdAt        DateTime      @default(now())
 
-  avatarOf Child? @relation("ChildPhoto")
+  avatarOf  Child? @relation("ChildPhoto")
+  consentOf Child? @relation("ChildConsentDocument")
 
   @@index([messageId])
   @@index([newsPostId])

@@ -138,3 +138,21 @@
     }
   }
 }
+
+/* Carte du code image d'un enfant : seule à l'impression (fiche d'un enfant). */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .carte-code,
+  .carte-code * {
+    visibility: visible;
+  }
+
+  .carte-code {
+    position: absolute;
+    inset: 0 auto auto 0;
+    border: 0;
+  }
+}

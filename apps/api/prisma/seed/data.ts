@@ -598,7 +598,10 @@ export function buildSeedData(today: Date): SeedData {
   const parrainLoad = new Map<string, number>();
   for (const { owner, names } of generatedChildren) {
     names.forEach(([firstName, gender], index) => {
-      const school = random.pick(schoolsOf(owner));
+      // « EPP Bè (12 enfants) » chez M. Koffi ; le tirage reste consommé pour les autres relais.
+      const drawn = random.pick(schoolsOf(owner));
+      const school =
+        owner === koffi ? (index < 9 ? eppBe : index < 11 ? eppAkodessewa : cegBe) : drawn;
       const age = school.level === "COLLEGE" ? random.int(12, 15) : random.int(6, 11);
       const className = (school.level === "COLLEGE" ? COLLEGE_CLASSES : PRIMARY_CLASSES)[age]!;
       // Le dernier enfant de Kara et de Kpalimé attend un parrain (avec Esther : 3 au total).

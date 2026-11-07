@@ -251,6 +251,7 @@ export class ParrainService {
       this.prisma.newsPost.findMany({
         where: {
           status: "PUBLISHED",
+          notifyParrains: true,
           children: { some: { childId: sponsorship.childId } },
           AND: [
             { publishedAt: { not: null, lte: at } },

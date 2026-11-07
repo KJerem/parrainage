@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { test as base, expect, request, type WorkerInfo } from "@playwright/test";
+import { test as base, expect, type Page, request, type WorkerInfo } from "@playwright/test";
 
 // Comptes du seed (apps/api/prisma/seed/data.ts), mot de passe commun « motdepasse ».
 export const PASSWORD = "motdepasse";
@@ -90,3 +90,17 @@ export const bureauTest = sessions.extend({
 });
 
 export { expect };
+
+/**
+ * Clés d'idempotence préfixées « e2e- » : le seed supprime ces messages au lancement suivant
+ * (les non-lus de la maquette restent ceux du seed).
+ */
+export async function withE2eKeys(page: Page) {
+  await page.addInitScript(() => {
+    const original = crypto.randomUUID.bind(crypto);
+    Object.defineProperty(crypto, "randomUUID", {
+      configurable: true,
+      value: () => `e2e-${original()}`,
+    });
+  });
+}

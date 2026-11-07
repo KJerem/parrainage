@@ -42,7 +42,14 @@ export const relaisRoutes: { path: string; title: string }[] = [
   { path: "/relais/messages", title: "Messages" },
   { path: "/relais/messages?onglet=bureau", title: "Messages" },
   { path: `/relais/messages/${CLAIRE_KOFFI_CONVERSATION}`, title: "Conversation avec Claire M." },
-  { path: "/relais/enfants/nouveau", title: "Rubrique à venir" },
+  { path: "/relais/sessions", title: "Rubrique à venir" },
+  { path: "/relais/enfants", title: "Enfants" },
+  { path: "/relais/enfants/nouveau", title: "Ajouter un enfant" },
+  { path: "/relais/enfants/seed-child-esther", title: "Fiche d'Esther" },
+  { path: "/relais/enfants/seed-child-aicha", title: "Fiche d'Aïcha" },
+  { path: "/relais/publier", title: "Publier une nouvelle" },
+  { path: "/relais/publier?enfant=seed-child-koffi-2", title: "Publier (sans consentement)" },
+  { path: "/relais/resultats", title: "Résultats scolaires" },
 ];
 
 // Pages de l'espace bureau, vérifiées connecté (axe, débordement).

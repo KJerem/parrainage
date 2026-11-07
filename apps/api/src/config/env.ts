@@ -31,6 +31,13 @@ export const envSchema = z
     /** Messages (et encouragements) par utilisateur et par fenêtre glissante. */
     MESSAGE_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
     MESSAGE_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(600),
+    /** Poivre du code image des enfants (Argon2id) ; le secret d'exemple est refusé en production. */
+    CHILD_CODE_PEPPER: z
+      .string()
+      .min(32, "CHILD_CODE_PEPPER doit compter au moins 32 caractères")
+      .default(`${EXAMPLE_SECRET_PREFIX}-poivre-du-code-image-des-enfants`),
+    /** Tâches planifiées (publication programmée, purge des fichiers) : « false » pour les couper. */
+    SCHEDULER_ENABLED: z.stringbool().default(true),
     /** Horloge figée (démo, e2e) : « 2026-10-31T10:00:00Z ». Vide : heure réelle. */
     APP_NOW: z.preprocess(
       (value) => (value === "" ? undefined : value),
@@ -43,6 +50,14 @@ export const envSchema = z
     {
       path: ["BETTER_AUTH_SECRET"],
       message: "BETTER_AUTH_SECRET : le secret d'exemple est interdit en production",
+    },
+  )
+  .refine(
+    (env) =>
+      env.NODE_ENV !== "production" || !env.CHILD_CODE_PEPPER.startsWith(EXAMPLE_SECRET_PREFIX),
+    {
+      path: ["CHILD_CODE_PEPPER"],
+      message: "CHILD_CODE_PEPPER : le secret d'exemple est interdit en production",
     },
   );
 

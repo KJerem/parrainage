@@ -49,6 +49,7 @@ const base: MediaFacts = {
   newsPost: null,
   schoolResult: null,
   avatarOf: null,
+  consentOf: null,
 };
 
 /** Pièce jointe d'un message de l'enfant dans la conversation du binôme Claire ↔ Aïcha. */
@@ -65,7 +66,10 @@ const childMessage = (moderationStatus: NonNullable<MediaFacts["message"]>["mode
   }) satisfies MediaFacts;
 
 const news = (status: "DRAFT" | "SCHEDULED" | "PUBLISHED", children: MediaChildFacts[]) =>
-  ({ ...base, newsPost: { status, relaisId: "r-lome", children } }) satisfies MediaFacts;
+  ({
+    ...base,
+    newsPost: { status, relaisId: "r-lome", notifyParrains: true, children },
+  }) satisfies MediaFacts;
 
 const bulletin = (status: "TO_ENTER" | "DRAFT" | "SENT", child: MediaChildFacts = aicha) =>
   ({ ...base, schoolResult: { status, child } }) satisfies MediaFacts;
@@ -196,10 +200,32 @@ describe("canViewMedia : nouvelles", () => {
       newsPost: {
         status: "PUBLISHED",
         relaisId: "r-lome",
+        notifyParrains: true,
         children: [{ ...aicha, relaisId: "r-kara" }],
       },
     };
     expect(canViewMedia(diallo, shared)).toBe(true);
+  });
+
+  it("garde aux parrains une nouvelle qui ne s'adresse pas à eux", () => {
+    const published = news("PUBLISHED", [aicha]);
+    const internal: MediaFacts = {
+      ...published,
+      newsPost: { ...published.newsPost, notifyParrains: false },
+    };
+    expect(viewers(published)).toContain("claire");
+    expect(viewers(internal)).not.toContain("claire");
+    expect(viewers(internal)).toContain("koffi");
+  });
+
+  it("ne montre une autorisation signée qu'à son relais et au bureau", () => {
+    const consent: MediaFacts = { ...base, consentOf: aicha };
+    expect(viewers(consent)).not.toContain("claire");
+    expect(viewers(consent)).not.toContain("paul");
+    expect(viewers(consent)).toContain("koffi");
+    expect(viewers(consent)).toContain("bureau");
+    expect(canViewMedia(diallo, consent)).toBe(false);
+    expect(isChildMedia(consent)).toBe(true);
   });
 });
 

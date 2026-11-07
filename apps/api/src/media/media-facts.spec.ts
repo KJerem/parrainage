@@ -18,6 +18,7 @@ const base: MediaFactsRow = {
   newsPost: null,
   schoolResult: null,
   avatarOf: null,
+  consentOf: null,
 };
 
 describe("toMediaFacts", () => {
@@ -51,6 +52,7 @@ describe("toMediaFacts", () => {
       newsPost: {
         status: "PUBLISHED",
         relaisId: "r-lome",
+        notifyParrains: true,
         children: [{ child: child(false, ["p-marc"]) }],
       },
       schoolResult: { status: "SENT", child: child(true, ["p-claire"]) },

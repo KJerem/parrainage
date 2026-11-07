@@ -598,6 +598,7 @@ export class MessagingService {
         newsPostId: true,
         schoolResultId: true,
         avatarOf: { select: { id: true } },
+        consentOf: { select: { id: true } },
       },
     });
     const usable = media.filter(
@@ -608,7 +609,8 @@ export class MessagingService {
         m.messageId === null &&
         m.newsPostId === null &&
         m.schoolResultId === null &&
-        m.avatarOf === null,
+        m.avatarOf === null &&
+        m.consentOf === null,
     );
     if (usable.length !== mediaIds.length) {
       throw new AppError(422, INVALID_ATTACHMENT_MESSAGE, {

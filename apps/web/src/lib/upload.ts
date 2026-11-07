@@ -8,6 +8,7 @@ import {
   type UploadedMedia,
   type UploadKind,
   type UploadPartUrl,
+  type UploadPurpose,
 } from "@parrainage/contracts";
 import { ApiRequestError, apiFetch, NETWORK_ERROR_MESSAGE } from "./api-client";
 
@@ -54,6 +55,8 @@ export type PutBlob = (
 ) => Promise<PutResult>;
 
 export type UploadOptions = {
+  /** Usage du fichier, contrôlé par l'API selon le rôle (par défaut : un message). */
+  purpose?: UploadPurpose;
   onProgress?: (progress: UploadProgress) => void;
   signal?: AbortSignal;
   /** Remplace le PUT par XMLHttpRequest (tests). */
@@ -66,6 +69,9 @@ const MB = 1024 * 1024;
 
 /** Photos : 1 600 px au plus grand côté, 1 Mo au plus, EXIF retiré (plan §8). */
 export const PHOTO_COMPRESSION = { maxWidthOrHeight: 1600, maxSizeMB: 1 } as const;
+
+/** Bulletins : plus grands, pour rester lisibles (plan §8). */
+export const BULLETIN_COMPRESSION = { maxWidthOrHeight: 1920, maxSizeMB: 2 } as const;
 
 const kindNames: Record<UploadKind, string> = {
   PHOTO: "une photo",
@@ -104,7 +110,11 @@ function fileNameFor(name: string | undefined, mimeType: string): string {
   return (trimmed || fallback).slice(-255);
 }
 
-async function compressPhoto(file: File | Blob, mimeType: string): Promise<Blob> {
+async function compressPhoto(
+  file: File | Blob,
+  mimeType: string,
+  limits: { maxWidthOrHeight: number; maxSizeMB: number } = PHOTO_COMPRESSION,
+): Promise<Blob> {
   // Chargé à la demande : la bibliothèque n'a rien à faire côté serveur.
   const { default: imageCompression } = await import("browser-image-compression");
   const accepted = uploadMimeTypes.PHOTO.includes(mimeType);
@@ -113,7 +123,7 @@ async function compressPhoto(file: File | Blob, mimeType: string): Promise<Blob>
       ? file
       : new File([file], fileNameFor(undefined, mimeType), { type: mimeType });
   return imageCompression(source, {
-    ...PHOTO_COMPRESSION,
+    ...limits,
     // Hors du thread principal, la bibliothèque irait chercher son code sur un CDN.
     useWebWorker: false,
     preserveExif: false,
@@ -132,7 +142,13 @@ export async function prepareFile(
   {
     fileName,
     compress = compressPhoto,
-  }: { fileName?: string; compress?: typeof compressPhoto } = {},
+    limits,
+  }: {
+    fileName?: string;
+    compress?: typeof compressPhoto;
+    /** Plafonds de compression d'une photo, s'ils diffèrent de ceux des messages. */
+    limits?: { maxWidthOrHeight: number; maxSizeMB: number };
+  } = {},
 ): Promise<PreparedFile> {
   const declared = baseMimeType(file.type);
   const name = fileName ?? (file instanceof File ? file.name : undefined);
@@ -140,7 +156,7 @@ export async function prepareFile(
   let mimeType = declared;
   if (declared.startsWith("image/")) {
     try {
-      blob = await compress(file, declared);
+      blob = await compress(file, declared, limits);
     } catch {
       throw new UploadError(
         "Cette photo n'a pas pu être préparée. Essayez une autre image, au format JPEG ou PNG.",
@@ -413,7 +429,7 @@ class Uploader {
       method: "POST",
       signal: this.options.signal,
       body: {
-        purpose: "message",
+        purpose: this.options.purpose ?? "message",
         kind: this.file.kind,
         mimeType: this.file.mimeType,
         sizeBytes: this.file.blob.size,

@@ -29,6 +29,7 @@ export class UploadsCleanupService {
         newsPostId: null,
         schoolResultId: null,
         avatarOf: { is: null },
+        consentOf: { is: null },
         OR: [
           { status: "PENDING_UPLOAD" },
           { status: "READY" },

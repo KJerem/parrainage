@@ -30,11 +30,13 @@ import {
   newMessageEmail,
 } from "../mail/templates.js";
 import { sendMailInBackground } from "../mail/transport.js";
+import { removeStoredFiles } from "../media/attach.js";
 import { listedMedia, listedMediaWhere, toMediaRef } from "../media/media-ref.js";
 import { BUREAU_NAME, childName } from "../messaging/present.js";
 import { MODERATED_KINDS, unreadWhere } from "../messaging/visibility.js";
 import { PrismaService } from "../prisma/prisma.service.js";
-import { isNotFound, StorageService } from "../storage/storage.service.js";
+import { lastNewsAtOf, lastNewsSelect } from "../relais/relais-common.js";
+import { StorageService } from "../storage/storage.service.js";
 
 const NOT_FOUND_MESSAGE = "Ce message est introuvable";
 const ALREADY_DECIDED_MESSAGE = "Ce message a déjà été traité par un autre membre du bureau";
@@ -250,14 +252,9 @@ export class ModerationService {
         select: { createdAt: true },
       }),
       conversation.childId
-        ? this.prisma.newsPost.findFirst({
-            where: {
-              status: "PUBLISHED",
-              publishedAt: { not: null, lte: at },
-              children: { some: { childId: conversation.childId } },
-            },
-            orderBy: { publishedAt: "desc" },
-            select: { publishedAt: true },
+        ? this.prisma.child.findUnique({
+            where: { id: conversation.childId },
+            select: lastNewsSelect(at),
           })
         : null,
     ]);
@@ -287,7 +284,7 @@ export class ModerationService {
         messageCount,
         heldCount,
         lastHeldAt: lastHeld?.createdAt.toISOString() ?? null,
-        lastNewsAt: lastNews?.publishedAt?.toISOString() ?? null,
+        lastNewsAt: lastNews ? (lastNewsAtOf(lastNews)?.toISOString() ?? null) : null,
       },
       now: at.toISOString(),
     };
@@ -357,7 +354,7 @@ export class ModerationService {
       });
     });
 
-    await this.dropFiles(removed);
+    await removeStoredFiles(this.prisma, this.storage, this.logger, removed);
     await this.notify(message, status, reason);
     return { id, moderationStatus: status, nextId: await this.nextPendingId() };
   }
@@ -436,30 +433,6 @@ export class ModerationService {
       throw new AppError(422, issue, { redactedBody: [issue] });
     }
     return removed;
-  }
-
-  /**
-   * Retire les fichiers refusés du stockage. En cas d'échec, la clé reste sur le média : la purge
-   * des fichiers sans usage réessaiera (UploadsCleanupService).
-   */
-  private async dropFiles(media: DecisionRow["media"]): Promise<void> {
-    for (const { id, storageKey } of media) {
-      if (!storageKey) {
-        continue;
-      }
-      try {
-        await this.storage.deleteObject(storageKey).catch((error: unknown) => {
-          if (!isNotFound(error)) {
-            throw error;
-          }
-        });
-        await this.prisma.media.update({ where: { id }, data: { storageKey: null } });
-      } catch (error) {
-        this.logger.warn(
-          `Fichier de ${id} à retirer plus tard : ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-    }
   }
 
   /**

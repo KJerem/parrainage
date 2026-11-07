@@ -58,7 +58,20 @@ describe("contenus du seed", () => {
       (r) => r.childId !== childId("aicha") && r.childId !== childId("kofi"),
     );
     expect(others).toHaveLength(data.children.length - 2);
-    expect(others.every((r) => r.status === "TO_ENTER" && r.averageX100 === null)).toBe(true);
+    const toEnter = others.filter((r) => r.status === "TO_ENTER");
+    expect(toEnter.every((r) => r.averageX100 === null && r.sentAt === null)).toBe(true);
+    // « Saisir 7 bulletins du T1 » chez M. Koffi, dont Esther, Yao et Mariam.
+    const koffiChildren = new Set(
+      data.children.filter((c) => c.relaisId === "seed-relais-koffi").map((c) => c.id),
+    );
+    const koffiToEnter = toEnter.filter((r) => koffiChildren.has(r.childId));
+    expect(koffiToEnter).toHaveLength(7);
+    expect(koffiToEnter.map((r) => r.childId)).toEqual(
+      expect.arrayContaining([childId("esther"), childId("yao"), childId("mariam")]),
+    );
+    const sent = others.filter((r) => r.status === "SENT");
+    expect(sent).toHaveLength(9);
+    expect(sent.every((r) => r.averageX100 !== null && r.sentAt !== null)).toBe(true);
   });
 
   it("ouvre une conversation par binôme actif, avec le parrain et l'enfant", () => {
@@ -282,6 +295,17 @@ describe("contenus du seed", () => {
     const komla = content.news.find((n) => n.childIds.includes(childId("koffi-2")))!;
     expect(withoutConsent.map((c) => c.id)).toContain(childId("koffi-2"));
     expect(content.media.some((m) => m.newsPostId === komla.id)).toBe(true);
+  });
+
+  it("trace les accords recueillis pour chaque enfant", () => {
+    const of = (slug: string) =>
+      content.consents.filter((c) => c.childId === childId(slug)).map((c) => c.type);
+    expect(of("aicha")).toEqual(["SPONSORSHIP", "MEDIA"]);
+    expect(of("koffi-2")).toEqual(["SPONSORSHIP"]);
+    expect(content.consents.every((c) => c.textVersion === "2026-10")).toBe(true);
+    const ids = content.consents.map((c) => c.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids.every((id) => id.startsWith("seed-"))).toBe(true);
   });
 
   it("donne à chaque enfant une photo de profil réservée", () => {
