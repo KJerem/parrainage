@@ -85,3 +85,55 @@ export function newMessageEmail(url: string): MailContent {
     notes: ["Connectez-vous à votre espace pour le lire et y répondre."],
   });
 }
+
+/** Destinataire d'un avis de modération : l'auteur adulte, ou le relais pour un enfant. */
+export type ModerationNoticeAudience = "parrain" | "relais";
+
+interface ModerationNotice {
+  url: string;
+  audience: ModerationNoticeAudience;
+  /** Motif (libellé fixe, jamais un extrait du message) ; `null` pour « Autre ». */
+  reason: string | null;
+  /** Règle de la charte concernée. */
+  rule: string | null;
+}
+
+function noticeNotes({ reason, rule }: ModerationNotice): string[] {
+  return [
+    ...(reason ? [`Motif : ${reason}.`] : []),
+    ...(rule ? [rule] : []),
+    ...(reason ? [] : ["Pour en savoir plus, écrivez à l'association depuis votre espace."]),
+  ];
+}
+
+/** Message retenu : motif et règle de la charte, aucun extrait du message. */
+export function messageHeldEmail(notice: ModerationNotice): MailContent {
+  const forRelais = notice.audience === "relais";
+  return linkEmail({
+    subject: forRelais
+      ? "Le message d'un enfant n'a pas été transmis"
+      : "Votre message n'a pas été transmis",
+    intro: forRelais
+      ? "L'association a relu le message d'un enfant que vous suivez et ne l'a pas transmis. Vous pourrez en parler avec lui à la prochaine session."
+      : "L'association a relu votre message et ne l'a pas transmis à l'enfant.",
+    action: "Voir la conversation",
+    url: notice.url,
+    notes: noticeNotes(notice),
+  });
+}
+
+/** Message transmis avec un passage ou une pièce jointe en moins. */
+export function messageMaskedEmail(notice: ModerationNotice): MailContent {
+  const forRelais = notice.audience === "relais";
+  return linkEmail({
+    subject: forRelais
+      ? "Le message d'un enfant a été transmis en partie"
+      : "Votre message a été transmis en partie",
+    intro: forRelais
+      ? "L'association a relu le message d'un enfant que vous suivez : elle en a retiré une partie avant de le transmettre."
+      : "L'association a relu votre message : elle en a retiré une partie avant de le transmettre à l'enfant.",
+    action: "Voir la conversation",
+    url: notice.url,
+    notes: noticeNotes(notice),
+  });
+}

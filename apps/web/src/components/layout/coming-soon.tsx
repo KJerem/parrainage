@@ -6,10 +6,14 @@ export function ComingSoon({
   title,
   description,
   icon,
+  backHref,
+  backLabel,
 }: {
   title: string;
   description: string;
   icon: ReactNode;
+  backHref: string;
+  backLabel: string;
 }) {
   return (
     <>
@@ -20,8 +24,8 @@ export function ComingSoon({
           title="Cette rubrique arrive bientôt"
           description={description}
           action={
-            <Button href="/parrain" variant="secondary" leftIcon={<ArrowLeftIcon size={18} />}>
-              Retour à mes filleuls
+            <Button href={backHref} variant="secondary" leftIcon={<ArrowLeftIcon size={18} />}>
+              {backLabel}
             </Button>
           }
         />

@@ -164,7 +164,11 @@ export function MessageItem({
         </div>
       ) : null}
       {message.masked ? (
-        <p className="m-0 text-12 text-muted">Un passage a été masqué par l&apos;association.</p>
+        // Le motif n'est transmis qu'à l'auteur du message (l'API le retire pour les autres).
+        <p className="m-0 text-12 text-muted">
+          Un passage a été masqué par l&apos;association
+          {message.moderationReason ? ` : ${message.moderationReason}` : ""}.
+        </p>
       ) : null}
       {mine && status ? (
         <p

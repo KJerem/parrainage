@@ -169,6 +169,51 @@ export function formatRelativeDay(
   return formatDayMonth(at, { month, withYear, timeZone });
 }
 
+/** Ancienneté courte : « 35 min », « 5 h », « 2 j » (jamais négative). */
+export function formatElapsed(date: Date | string, now: Date | string): string {
+  const elapsed = new Date(now).getTime() - new Date(date).getTime();
+  const minutes = Math.max(1, Math.floor(elapsed / 60_000));
+  if (minutes < 60) {
+    return `${minutes} min`;
+  }
+  const hours = Math.floor(minutes / 60);
+  return hours < 48 ? `${hours} h` : `${Math.floor(hours / 24)} j`;
+}
+
+/**
+ * Réception d'un message : « à l'instant », « il y a 5 h » le jour même, « hier », puis
+ * « il y a 3 j » et la date.
+ */
+export function formatReceived(
+  date: Date | string,
+  now: Date | string,
+  timeZone = PARRAIN_TIME_ZONE,
+): string {
+  const at = new Date(date);
+  const reference = new Date(now);
+  if (reference.getTime() - at.getTime() < 60_000) {
+    return "à l'instant";
+  }
+  const days = dayNumber(reference, timeZone) - dayNumber(at, timeZone);
+  if (days === 0) {
+    return `il y a ${formatElapsed(at, reference)}`;
+  }
+  return days === 1 ? "hier" : formatRelativeDay(at, reference, { timeZone });
+}
+
+/** Jours écoulés en toutes lettres : « aujourd'hui », « hier », « il y a 64 jours ». */
+export function formatDaysAgo(
+  date: Date | string,
+  now: Date | string,
+  timeZone = PARRAIN_TIME_ZONE,
+): string {
+  const days = dayNumber(new Date(now), timeZone) - dayNumber(new Date(date), timeZone);
+  if (days <= 0) {
+    return "aujourd'hui";
+  }
+  return days === 1 ? "hier" : `il y a ${days} jours`;
+}
+
 const clockFormats = new Map<string, Intl.DateTimeFormat>();
 
 /** Heure « 15:00 » dans le fuseau. */

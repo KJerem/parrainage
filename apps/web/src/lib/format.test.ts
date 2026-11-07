@@ -5,14 +5,17 @@ import {
   formatAverage,
   formatClock,
   formatDayMonth,
+  formatDaysAgo,
   formatDaySeparator,
   formatDuration,
+  formatElapsed,
   formatEuros,
   formatListDate,
   formatLongDate,
   formatMonthYear,
   formatPeriodKey,
   formatRank,
+  formatReceived,
   formatRelativeDay,
   RELAIS_TIME_ZONE,
 } from "./format";
@@ -148,5 +151,41 @@ describe("dates de la messagerie", () => {
     expect(civilDayKey("2026-10-30T22:30:00Z")).toBe("2026-10-30");
     expect(civilDayKey("2026-10-30T23:30:00Z")).toBe("2026-10-31");
     expect(civilDayKey("2026-10-30T23:30:00Z", RELAIS_TIME_ZONE)).toBe("2026-10-30");
+  });
+});
+
+describe("formatElapsed, formatReceived et formatDaysAgo", () => {
+  const now = "2026-10-31T10:00:00Z";
+
+  it("donne une ancienneté courte, jamais négative", () => {
+    expect(formatElapsed("2026-10-31T09:25:00Z", now)).toBe("35 min");
+    expect(formatElapsed("2026-10-31T05:00:00Z", now)).toBe("5 h");
+    expect(formatElapsed("2026-10-30T22:00:00Z", now)).toBe("12 h");
+    expect(formatElapsed("2026-10-28T10:00:00Z", now)).toBe("3 j");
+    expect(formatElapsed("2026-10-31T12:00:00Z", now)).toBe("1 min");
+  });
+
+  it("reprend les libellés de la colonne « Reçu » de la maquette", () => {
+    expect(formatReceived("2026-10-31T08:00:00Z", now)).toBe("il y a 2 h");
+    expect(formatReceived("2026-10-31T05:00:00Z", now)).toBe("il y a 5 h");
+    expect(formatReceived("2026-10-30T22:00:00Z", now)).toBe("hier");
+    expect(formatReceived("2026-10-28T10:00:00Z", now)).toBe("il y a 3 j");
+    expect(formatReceived("2026-09-12T10:00:00Z", now)).toBe("12 septembre");
+  });
+
+  it("garde « à l'instant » pour un message tout juste reçu ou daté d'après l'horloge", () => {
+    expect(formatReceived("2026-10-31T09:59:30Z", now)).toBe("à l'instant");
+    expect(formatReceived("2026-10-31T12:00:00Z", now)).toBe("à l'instant");
+  });
+
+  it("compte les jours civils du fuseau", () => {
+    // 23 h à Paris la veille, même si moins de 24 h se sont écoulées.
+    expect(formatReceived("2026-10-30T22:30:00Z", "2026-10-31T00:30:00Z")).toBe("hier");
+  });
+
+  it("écrit les jours en toutes lettres", () => {
+    expect(formatDaysAgo("2026-08-28T09:00:00Z", now)).toBe("il y a 64 jours");
+    expect(formatDaysAgo("2026-10-30T09:00:00Z", now)).toBe("hier");
+    expect(formatDaysAgo("2026-10-31T09:00:00Z", now)).toBe("aujourd'hui");
   });
 });

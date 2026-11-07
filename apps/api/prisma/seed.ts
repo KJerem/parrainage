@@ -106,9 +106,24 @@ async function seedContent(content: SeedContent): Promise<{ uploaded: number }> 
   );
 
   // Messages laissés par des tests e2e interrompus (clé d'idempotence « e2e-… ») : supprimés,
-  // pour que les non-lus du seed restent ceux de la maquette. Les autres ajouts sont conservés.
+  // pour que les non-lus du seed restent ceux de la maquette. Les autres ajouts sont conservés,
+  // sauf pour les suites de tests (SEED_RESET_MESSAGES=1) : elles comparent les conversations de
+  // démonstration à la maquette, sans message ajouté à la main.
+  const resetDemoConversations = process.env.SEED_RESET_MESSAGES === "1";
   const leftovers = await prisma.message.findMany({
-    where: { idempotencyKey: { contains: ":e2e-" } },
+    where: {
+      OR: [
+        { idempotencyKey: { contains: ":e2e-" } },
+        ...(resetDemoConversations
+          ? [
+              {
+                conversationId: { startsWith: SEED_PREFIX },
+                NOT: { id: { startsWith: SEED_PREFIX } },
+              },
+            ]
+          : []),
+      ],
+    },
     select: { id: true },
   });
   if (leftovers.length > 0) {

@@ -1,5 +1,12 @@
 // Contenus de démonstration (plan §10) : périodes et résultats scolaires, nouvelles, conversations
 // des binômes, messages, médias et versements simulés. Dates relatives au jour du seed.
+import {
+  type AlertSpan,
+  type AlertType,
+  detectAlerts,
+  type ManualFlag,
+  moderationReasonLabels,
+} from "@parrainage/contracts";
 import type { Gender, SeedChild, SeedData, SeedParrain, SeedSponsorship } from "./data.js";
 import { addDays, schoolYearOf } from "./dates.js";
 import { minimalPdf } from "./pdf.js";
@@ -80,9 +87,12 @@ export interface SeedMessage {
   conversationId: string;
   kind: "TEXT" | "NEWSLETTER";
   body: string;
-  /** Enfant ↔ parrain : relu (APPROVED) ; entre adultes : sans relecture (NOT_REQUIRED). */
-  moderationStatus: "APPROVED" | "NOT_REQUIRED";
-  deliveryStatus: "VERIFIED" | "RECEIVED";
+  /**
+   * Enfant ↔ parrain : relu (APPROVED, HELD) ou en file de modération (PENDING) ; entre adultes :
+   * sans relecture (NOT_REQUIRED).
+   */
+  moderationStatus: "APPROVED" | "NOT_REQUIRED" | "PENDING" | "HELD";
+  deliveryStatus: "SENT" | "VERIFIED" | "RECEIVED";
   reviewedById: string | null;
   reviewedAt: Date | null;
   autoApproved: boolean;
@@ -91,6 +101,12 @@ export interface SeedMessage {
   authorUserId: string | null;
   authorChildId: string | null;
   createdAt: Date;
+  // Toujours écrits, pour qu'un nouveau seed efface les décisions prises entre-temps.
+  alertTypes: AlertType[];
+  autoAlerts: AlertSpan[];
+  manualFlags: ManualFlag[];
+  moderationReason: string | null;
+  redactedBody: null;
 }
 
 export interface SeedMedia {
@@ -224,6 +240,49 @@ const NEWS_TEMPLATES: readonly ((child: SeedChild) => { title: string; body: str
     title: "Nouvel uniforme",
     body: `${c.firstName} a reçu un nouvel uniforme grâce à votre parrainage. ${pronoun(c.gender)} vous dit merci !`,
   }),
+];
+
+/** Échanges relus de Paul et Kofi, en alternance (Paul écrit le premier). */
+const PAUL_KOFI_HISTORY = [
+  "Bonjour Kofi ! Je suis très heureux d'être ton parrain. Parle-moi de ton école ?",
+  "Bonjour Paul ! Mon école est grande et j'ai beaucoup de copains. Merci pour les cahiers.",
+  "Quelle est ta matière préférée cette année ?",
+  "J'aime le calcul et le sport. Je joue au foot à la récréation.",
+  "Moi aussi j'aimais le foot à ton âge. À quel poste joues-tu ?",
+  "Je suis attaquant ! Le maître dit que je cours vite.",
+  "Bravo ! As-tu bien travaillé ce trimestre ?",
+  "Oui, j'ai progressé en lecture. Je lis une page chaque soir.",
+  "C'est une très bonne habitude, continue comme ça.",
+  "Merci Paul. Nous avons fêté la fin de l'année à l'école.",
+  "Bonnes vacances Kofi ! Repose-toi bien.",
+  "Merci ! J'aide ma grand-mère au marché pendant les vacances.",
+  "C'est gentil de ta part. Prêt pour la rentrée ?",
+  "Oui, je suis en CE1 maintenant et j'ai une nouvelle maîtresse.",
+  "Raconte-moi ce que tu apprends avec elle.",
+  "Nous apprenons les tables de multiplication. C'est difficile mais j'y arrive.",
+  "Bravo pour tes efforts, je suis fier de toi.",
+  "Merci Paul ! J'ai eu une bonne note en dictée.",
+  "Formidable ! Continue à bien lire chaque soir.",
+  "Oui ! Je lis maintenant à ma petite sœur aussi.",
+  "Quelle bonne idée. Bonnes vacances à toute ta famille !",
+];
+
+/** Messages en attente des binômes de Kara et Kpalimé, sans alerte (le 4e a une photo). */
+const OTHER_PENDING_MESSAGES: readonly { author: "child" | "parrain"; body: string }[] = [
+  {
+    author: "child",
+    body: "Bonjour ! J'ai bien reçu les cahiers, merci beaucoup. Je travaille bien à l'école.",
+  },
+  { author: "parrain", body: "Bravo pour tes progrès en lecture, continue comme ça !" },
+  { author: "child", body: "Merci pour ta lettre. Cette semaine nous avons appris les fractions." },
+  { author: "child", body: "Ma classe a planté des arbres dans la cour, c'était très bien !" },
+  {
+    author: "parrain",
+    body: "J'espère que la rentrée s'est bien passée. Quelle est ta matière préférée ?",
+  },
+  { author: "child", body: "Bonjour, je vais bien. J'aime beaucoup aller à l'école." },
+  { author: "parrain", body: "Nous pensons bien à toi. Comment va ta famille ?" },
+  { author: "parrain", body: "Quel beau dessin ! Merci de me l'avoir envoyé." },
 ];
 
 export function buildSeedContent(today: Date, data: SeedData): SeedContent {
@@ -369,8 +428,16 @@ export function buildSeedContent(today: Date, data: SeedData): SeedContent {
   const kofiThanks = new Date(
     Math.min(at(utcDay(startYear, 8, 2), 15).getTime(), at(ago(1), 9).getTime()),
   );
+  const noModeration = {
+    alertTypes: [],
+    autoAlerts: [],
+    manualFlags: [],
+    moderationReason: null,
+    redactedBody: null,
+  } satisfies Partial<SeedMessage>;
   const messages: SeedMessage[] = [
     {
+      ...noModeration,
       id: "seed-message-claire-to-aicha",
       conversationId: conversationId(claireAicha),
       kind: "TEXT",
@@ -387,6 +454,7 @@ export function buildSeedContent(today: Date, data: SeedData): SeedContent {
       createdAt: claireToAicha,
     },
     {
+      ...noModeration,
       id: "seed-message-aicha-to-claire",
       conversationId: conversationId(claireAicha),
       kind: "TEXT",
@@ -403,6 +471,7 @@ export function buildSeedContent(today: Date, data: SeedData): SeedContent {
       createdAt: aichaToClaire,
     },
     {
+      ...noModeration,
       id: "seed-message-kofi-to-claire",
       conversationId: conversationId(claireKofi),
       kind: "TEXT",
@@ -421,24 +490,188 @@ export function buildSeedContent(today: Date, data: SeedData): SeedContent {
     },
   ];
 
+  // ─── Historique de Paul ↔ Kofi (B-Moderation : « 23 messages · 1 retenu (mars 2025) ») ───
+  const paulKofi = sponsorshipOf("kofi", "paul");
+  const paulUserId = parrainOf(paulKofi).id;
+  const historyFirst = addDays(paulKofi.startDate, 20).getTime();
+  const historyLast = at(ago(64), 15).getTime();
+  const paulKofiHistory = PAUL_KOFI_HISTORY.map((body, index): SeedMessage => {
+    const fromPaul = index % 2 === 0;
+    const createdAt = new Date(
+      historyFirst + ((historyLast - historyFirst) * index) / (PAUL_KOFI_HISTORY.length - 1),
+    );
+    return {
+      ...noModeration,
+      id: `seed-message-kofi-paul-${index + 1}`,
+      conversationId: conversationId(paulKofi),
+      kind: "TEXT",
+      body,
+      moderationStatus: "APPROVED",
+      deliveryStatus: "RECEIVED",
+      reviewedById: bureauUserId,
+      reviewedAt: new Date(createdAt.getTime() + 3 * 3600 * 1000),
+      autoApproved: false,
+      sentFrom: fromPaul ? "WEB" : "SCHOOL_SESSION",
+      readAt: new Date(createdAt.getTime() + 24 * 3600 * 1000),
+      authorUserId: fromPaul ? paulUserId : null,
+      authorChildId: fromPaul ? null : kofi.id,
+      createdAt,
+    };
+  });
+  const paulKofiLastRead = new Date(historyLast + 24 * 3600 * 1000);
+  const heldBody = "Tu peux m'écrire sur Facebook, je t'enverrai mon profil.";
+  const heldDetection = detectAlerts(heldBody);
+  // Mois comptés à partir de 0 : le 12 mars de l'avant-dernière année civile de la rentrée.
+  const heldAt = at(utcDay(startYear - 1, 2, 12), 18);
+  messages.push(...paulKofiHistory, {
+    ...noModeration,
+    id: "seed-message-kofi-paul-retenu",
+    conversationId: conversationId(paulKofi),
+    kind: "TEXT",
+    body: heldBody,
+    moderationStatus: "HELD",
+    deliveryStatus: "SENT",
+    reviewedById: bureauUserId,
+    reviewedAt: new Date(heldAt.getTime() + 2 * 3600 * 1000),
+    autoApproved: false,
+    sentFrom: "WEB",
+    readAt: null,
+    authorUserId: paulUserId,
+    authorChildId: null,
+    createdAt: heldAt,
+    alertTypes: heldDetection.types,
+    autoAlerts: heldDetection.spans,
+    moderationReason: moderationReasonLabels.OFF_PLATFORM_CONTACT,
+  });
+
+  // ─── File de modération (Bureau, B-Moderation) : 12 messages, dont 3 avec un média ─────────
+  // Datés du jour du seed, pour la maquette à 10 h (« il y a 5 h », « il y a 2 h », « hier »).
+  const pendingMessage = (
+    slug: string,
+    sponsorship: SeedSponsorship,
+    author: "child" | "parrain",
+    body: string,
+    createdAt: Date,
+    manualFlags: ManualFlag[] = [],
+  ): SeedMessage => {
+    const detection = detectAlerts(body);
+    return {
+      ...noModeration,
+      id: `seed-message-attente-${slug}`,
+      conversationId: conversationId(sponsorship),
+      kind: "TEXT",
+      body,
+      moderationStatus: "PENDING",
+      deliveryStatus: "SENT",
+      reviewedById: null,
+      reviewedAt: null,
+      autoApproved: false,
+      sentFrom: author === "child" ? "SCHOOL_SESSION" : "WEB",
+      readAt: null,
+      authorUserId: author === "parrain" ? parrainOf(sponsorship).id : null,
+      authorChildId: author === "child" ? sponsorship.childId : null,
+      createdAt,
+      alertTypes: detection.types,
+      autoAlerts: detection.spans,
+      manualFlags,
+    };
+  };
+  const mariamAt = at(ago(1), 22);
+  const aichaPendingAt = at(today, 8);
+  messages.push(
+    pendingMessage(
+      "paul",
+      paulKofi,
+      "parrain",
+      "Salut Kofi ! Bravo pour ton match de foot. Si tu veux, tu peux m'appeler directement sur WhatsApp au 06 39 98 12 34, ce sera plus simple. À bientôt !",
+      at(today, 5),
+    ),
+    pendingMessage("mariam", sponsorshipOf("mariam", "helene"), "child", "", mariamAt, [
+      "OTHER_CHILD_FACE",
+    ]),
+    pendingMessage(
+      "aicha",
+      claireAicha,
+      "child",
+      "Bonjour tata Claire ! Voici la deuxième page de mon bulletin, celle que j'avais oubliée. Le maître m'a félicitée en lecture.",
+      aichaPendingAt,
+    ),
+    pendingMessage(
+      "yao",
+      sponsorshipOf("yao", "marc"),
+      "child",
+      "Bonjour Marc ! Je suis entré en 5e cette année. J'aime beaucoup les sciences et je lis le livre que tu m'as envoyé.",
+      at(today, 8, 10),
+    ),
+  );
+  const distantSponsorships = data.sponsorships.filter(
+    (s) => s.status === "ACTIVE" && /^seed-child-(diallo|agbeko)-/.test(s.childId),
+  );
+  OTHER_PENDING_MESSAGES.forEach(({ author, body }, index) => {
+    const sponsorship = distantSponsorships[index];
+    if (!sponsorship) {
+      throw new Error(`Binôme du seed introuvable pour le message en attente ${index + 1}`);
+    }
+    messages.push(
+      pendingMessage(
+        `relais-${index + 1}`,
+        sponsorship,
+        author,
+        body,
+        at(today, 8, 20 + index * 5),
+      ),
+    );
+  });
+  addMedia({
+    id: "seed-media-attente-aicha-bulletin",
+    kind: "BULLETIN",
+    mimeType: "application/pdf",
+    label: "Bulletin T1 : page 2",
+    messageId: "seed-message-attente-aicha",
+    createdAt: aichaPendingAt,
+  });
+  addMedia({
+    id: "seed-media-attente-mariam-video",
+    kind: "VIDEO",
+    mimeType: "video/mp4",
+    label: "Vidéo de la classe",
+    durationSec: 35,
+    messageId: "seed-message-attente-mariam",
+    createdAt: mariamAt,
+  });
+  addMedia({
+    id: "seed-media-attente-photo",
+    kind: "PHOTO",
+    mimeType: "image/jpeg",
+    label: "Photo de la cour",
+    messageId: "seed-message-attente-relais-4",
+    createdAt: at(today, 8, 35),
+  });
+
   const conversations: SeedConversation[] = data.sponsorships
     .filter((s) => s.status === "ACTIVE")
     .map((s) => {
       const id = conversationId(s);
-      const own = messages.filter((m) => m.conversationId === id);
+      // Le message d'un enfant ne compte qu'une fois remis : son parrain ne l'a pas encore vu.
+      const own = messages.filter(
+        (m) => m.conversationId === id && !(m.moderationStatus === "PENDING" && m.authorChildId),
+      );
       const createdAt = at(s.startDate, 9);
       const lastMessageAt = own.reduce(
         (latest, m) => (m.createdAt > latest ? m.createdAt : latest),
         createdAt,
       );
       // Claire a lu le merci de Kofi, pas encore le message d'Aïcha d'hier (« Aïcha vous a
-      // écrit » sur la maquette). Les autres parrains n'ont rien lu.
+      // écrit » sur la maquette). Paul a tout lu de son long historique avec Kofi. Les autres
+      // parrains n'ont rien lu.
       const parrainRead =
         id === conversationId(claireAicha)
           ? claireToAicha
           : id === conversationId(claireKofi)
             ? new Date(kofiThanks.getTime() + 5 * 3600 * 1000)
-            : null;
+            : id === conversationId(paulKofi)
+              ? paulKofiLastRead
+              : null;
       const childRead = id === conversationId(claireAicha) ? at(ago(15), 15, 10) : null;
       return {
         id,
@@ -471,6 +704,7 @@ export function buildSeedContent(today: Date, data: SeedData): SeedContent {
     readAt: Date | null,
     kind: SeedMessage["kind"] = "TEXT",
   ): SeedMessage => ({
+    ...noModeration,
     id: `seed-message-${slug}`,
     conversationId: `seed-conversation-${conversation}`,
     kind,

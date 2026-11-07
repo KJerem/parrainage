@@ -214,7 +214,11 @@ describe("Espace parrain et médias (e2e)", () => {
         "message:Merci pour le ballon !",
         "news:Fin des vacances",
       ]);
-      expect(summary(paul.feed)).toEqual(["news:Fin des vacances"]);
+      // Paul voit ses échanges avec Kofi, jamais ceux de Claire, ni son message retenu.
+      const paulFeed = summary(paul.feed);
+      expect(paulFeed).toContain("news:Fin des vacances");
+      expect(paulFeed).not.toContain("message:Merci pour le ballon !");
+      expect(paulFeed.join()).not.toMatch(/Facebook|WhatsApp/);
       expect(paul.conversationId).toBe("seed-conversation-kofi-paul");
       expect(paul.child.sponsoredSince).toBe("2024-01-15");
       // Ses versements à lui seulement.

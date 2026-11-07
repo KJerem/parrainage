@@ -113,6 +113,8 @@ describe("contenus du seed", () => {
             (m) =>
               m.conversationId === c.id &&
               m.authorUserId !== userId &&
+              // Un message en file de modération n'est pas encore remis.
+              m.moderationStatus !== "PENDING" &&
               (!me.lastReadAt || m.createdAt > me.lastReadAt),
           )
           .map((m) => m.id);
@@ -123,6 +125,73 @@ describe("contenus du seed", () => {
       "seed-message-koffi-to-claire",
     ]);
     expect(unreadFor(data.relais[0]!.id)).toEqual(["seed-message-claire-to-koffi"]);
+  });
+
+  describe("file de modération", () => {
+    const pending = content.messages.filter((m) => m.moderationStatus === "PENDING");
+    const pendingBy = (slug: string) =>
+      content.messages.find((m) => m.id === `seed-message-attente-${slug}`)!;
+    const mediaOf = (messageId: string) => content.media.filter((m) => m.messageId === messageId);
+
+    it("contient 12 messages, dont 3 avec un média", () => {
+      expect(pending).toHaveLength(12);
+      const withMedia = pending.filter((m) => mediaOf(m.id).length > 0);
+      expect(withMedia.map((m) => m.id).sort()).toEqual([
+        "seed-message-attente-aicha",
+        "seed-message-attente-mariam",
+        "seed-message-attente-relais-4",
+      ]);
+      expect(pending.every((m) => m.reviewedAt === null && m.deliveryStatus === "SENT")).toBe(true);
+    });
+
+    it("n'a de coordonnées que dans le message de Paul, au bon endroit", () => {
+      const paul = pendingBy("paul");
+      expect(paul.alertTypes).toEqual(["PHONE", "SOCIAL"]);
+      expect(paul.autoAlerts.map((span) => paul.body.slice(span.start, span.end))).toEqual([
+        "WhatsApp",
+        "06 39 98 12 34",
+      ]);
+      expect(pending.filter((m) => m.alertTypes.length > 0).map((m) => m.id)).toEqual([paul.id]);
+    });
+
+    it("reprend les exemples du design : Aïcha, Mariam et Yao", () => {
+      expect(mediaOf(pendingBy("aicha").id).map((m) => [m.kind, m.label])).toEqual([
+        ["BULLETIN", "Bulletin T1 : page 2"],
+      ]);
+      expect(pendingBy("mariam")).toMatchObject({
+        body: "",
+        manualFlags: ["OTHER_CHILD_FACE"],
+        authorChildId: childId("mariam"),
+      });
+      expect(mediaOf(pendingBy("mariam").id)[0]).toMatchObject({ kind: "VIDEO", durationSec: 35 });
+      expect(mediaOf(pendingBy("yao").id)).toEqual([]);
+    });
+
+    it("ne fait pas remonter une conversation pour le message en attente d'un enfant", () => {
+      const thread = content.conversations.find((c) => c.id === "seed-conversation-aicha-claire")!;
+      expect(thread.lastMessageAt).toEqual(new Date("2026-10-30T15:00:00Z"));
+    });
+
+    it("reconstitue l'historique de Paul et Kofi : 23 messages, 1 retenu en mars 2025", () => {
+      const own = content.messages.filter(
+        (m) => m.conversationId === "seed-conversation-kofi-paul",
+      );
+      expect(own).toHaveLength(23);
+      const held = own.filter((m) => m.moderationStatus === "HELD");
+      expect(held).toHaveLength(1);
+      expect(held[0]!.createdAt.toISOString().slice(0, 7)).toBe("2025-03");
+      expect(held[0]!.moderationReason).toBe("Contact direct hors plateforme");
+      const paulThread = content.conversations.find((c) => c.id === "seed-conversation-kofi-paul")!;
+      const lastApproved = own
+        .filter((m) => m.moderationStatus === "APPROVED")
+        .map((m) => m.createdAt)
+        .sort((a, b) => a.getTime() - b.getTime())
+        .at(-1)!;
+      // Paul a tout lu : pas de non-lu laissé par l'historique.
+      expect(paulThread.participants[0]!.lastReadAt!.getTime()).toBeGreaterThan(
+        lastApproved.getTime(),
+      );
+    });
   });
 
   it("reprend les échanges du design, dans les conversations de Claire", () => {
@@ -227,10 +296,15 @@ describe("contenus du seed", () => {
   it("ne date aucun contenu après le jour du seed", () => {
     const dates = [
       ...content.news.map((n) => n.publishedAt),
-      ...content.messages.map((m) => m.createdAt),
+      ...content.messages.filter((m) => m.moderationStatus !== "PENDING").map((m) => m.createdAt),
       ...content.results.flatMap((r) => (r.sentAt ? [r.sentAt] : [])),
     ];
     expect(dates.every((d) => d.getTime() < today.getTime())).toBe(true);
+    // Sauf la file de modération, du matin même (« il y a 2 h »), jamais après 10 h.
+    const queue = content.messages.filter((m) => m.moderationStatus === "PENDING");
+    expect(queue.every((m) => m.createdAt.getTime() <= today.getTime() + 10 * 3600 * 1000)).toBe(
+      true,
+    );
   });
 });
 

@@ -7,6 +7,7 @@ export const PASSWORD = "motdepasse";
 export const CLAIRE = "claire.m@exemple.fr";
 export const KOFFI = "koffi@relais.exemple.tg";
 export const PAUL = "paul.d@exemple.fr";
+export const BUREAU = "bureau@exemple.fr";
 
 /**
  * Ouvre une session comme le formulaire de connexion (POST /api/auth/sign-in/email, avec
@@ -46,7 +47,12 @@ async function workerSession(email: string, slug: string, workerInfo: WorkerInfo
   return fs.existsSync(file) ? file : saveSession(baseURL, email, file);
 }
 
-type Sessions = { claireState: string; koffiState: string; paulState: string };
+type Sessions = {
+  claireState: string;
+  koffiState: string;
+  paulState: string;
+  bureauState: string;
+};
 
 // Second argument nommé `provide` (et non `use`) : la règle des hooks React le confondrait.
 const sessions = base.extend<object, Sessions>({
@@ -62,6 +68,10 @@ const sessions = base.extend<object, Sessions>({
     async ({}, provide, workerInfo) => provide(await workerSession(PAUL, "paul", workerInfo)),
     { scope: "worker" },
   ],
+  bureauState: [
+    async ({}, provide, workerInfo) => provide(await workerSession(BUREAU, "bureau", workerInfo)),
+    { scope: "worker" },
+  ],
 });
 
 /** Tests de l'espace parrain : la page est ouverte avec la session de Claire. */
@@ -72,6 +82,11 @@ export const test = sessions.extend({
 /** Tests de l'espace relais : la page est ouverte avec la session de M. Koffi. */
 export const relaisTest = sessions.extend({
   storageState: ({ koffiState }, provide) => provide(koffiState),
+});
+
+/** Tests de l'espace bureau : la page est ouverte avec la session du bureau. */
+export const bureauTest = sessions.extend({
+  storageState: ({ bureauState }, provide) => provide(bureauState),
 });
 
 export { expect };

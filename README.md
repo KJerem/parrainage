@@ -50,7 +50,7 @@ npm run dev        # API (port 4000) et web (port 3000)
 | `npm run dev` | compile les contrats puis lance, en parallèle, leur compilation continue, l'API et le web |
 | `npm run verify` | lint, vérification des types, tests et builds de tous les paquets (contrats, API, web) |
 | `npm run test` | tests unitaires (Vitest) |
-| `npm run test:e2e -w @parrainage/api` | tests e2e de l'API (services Docker démarrés) ; rejoue le seed avant la suite, sans rien effacer d'autre |
+| `npm run test:e2e -w @parrainage/api` | tests e2e de l'API (services Docker démarrés) ; rejoue le seed avant la suite et efface les messages ajoutés à la main dans les conversations de démonstration, rien d'autre |
 | `npm run test:e2e -w @parrainage/web` | tests Playwright du web : authentification et rôles, espace parrain, débordement horizontal (360 → 1440 px) et accessibilité (axe). **Remet à zéro la base de développement** (voir ci-dessous) |
 | `npm run format` | formatage (Prettier) |
 | `npm run db:migrate` / `db:seed` / `db:reset` / `db:studio` | base de données (Prisma) |
@@ -69,6 +69,8 @@ Créés par `npm run db:reset` (ou `npm run db:seed`, idempotent). Mot de passe 
 Les liens de connexion et de réinitialisation du mot de passe arrivent dans Mailpit (http://localhost:8025).
 
 Le seed crée aussi les contenus du design : nouvelles des relais, échanges Claire ↔ Aïcha, résultats scolaires (Aïcha : 11,8 puis 13,4 / 20), versements simulés depuis janvier 2024 et un vrai bulletin PDF déposé dans le stockage (sans stockage démarré, il reste un emplacement réservé). Les autres médias sont des emplacements réservés (`PLACEHOLDER`).
+
+Côté modération : **12 messages en attente**, dont 3 avec un média (Paul → Kofi avec un numéro WhatsApp fictif, Mariam → Hélène avec une vidéo signalée, Aïcha → Claire avec une page de bulletin, Yao → Marc, et 8 messages des binômes de Kara et Kpalimé). L'historique de Paul ↔ Kofi compte 23 messages, dont 1 retenu en mars 2025.
 
 Côté messagerie : Claire ↔ M. Koffi (demande d'appel, puis « Créneau proposé pour l'appel »), Paul ↔ M. Koffi, Hélène ↔ M. Koffi, M. Koffi ↔ bureau (« Reçus d'octobre ») et la lettre d'information du bureau à Claire. Claire a **2 messages non lus** (le message d'Aïcha d'hier et le créneau proposé par M. Koffi), M. Koffi **1** (la demande de Claire).
 
@@ -91,14 +93,27 @@ Côté messagerie : Claire ↔ M. Koffi (demande d'appel, puis « Créneau propo
 - **Limite d'envoi** : `MESSAGE_RATE_LIMIT_MAX` messages par `MESSAGE_RATE_LIMIT_WINDOW_SECONDS` et par utilisateur (429 au-delà). Le seed remet ces compteurs à zéro pour les comptes de démonstration.
 - **Côté web** (`apps/web/src/components/messaging`, `src/lib/upload.ts`) : `/parrain/messages` et `/relais/messages?onglet=parrains|bureau` (liste et conversation la plus récente à partir de md, liste seule en dessous), `/…/messages/[id]` pour une conversation. Les photos sont compressées dans le navigateur (`browser-image-compression` : 1 600 px, 1 Mo, EXIF retiré) avant l'envoi ; un envoi multipart interrompu reprend au nouvel essai (état gardé en `sessionStorage`, seules les parts manquantes repartent). Le message vidéo utilise `MediaRecorder` (mp4 si le navigateur sait l'enregistrer, sinon webm ; 2 minutes, environ 1 Mb/s). Avant l'envoi à un enfant, le détecteur prévient quand le texte semble contenir des coordonnées ; le message reste envoyable.
 
+## Modération
+
+Le bureau relit chaque message échangé avec un enfant, sur `/bureau` (file et approbation sur place) et `/bureau/moderation` (file et message relu).
+
+- **Ordre de la file** : les messages avec une alerte du détecteur d'abord, puis du plus ancien au plus récent. Filtres `?filtre=enfant|parrain|signales` sur la vue d'ensemble.
+- **Décisions** (`POST /api/moderation/messages/:id/decision`), atomiques et auditées : une seule s'applique si deux membres décident en même temps (l'autre reçoit 409). Après une décision, la page passe au message suivant.
+  - **Approuver** : le message est remis tel quel. Une alerte demande confirmation.
+  - **Masquer** : motif obligatoire, texte proposé puis corrigeable, pièces jointes retirables. Le destinataire ne reçoit que cette version, et un fichier retiré est effacé du stockage.
+  - **Retenir** : motif obligatoire, le message n'est pas remis.
+- **E-mails** : un lien, jamais une ligne du message. Le parrain d'un enfant est prévenu d'un message remis, sauf s'il a déjà des non-lus dans cette conversation. Message retenu ou masqué : l'auteur adulte reçoit le motif et la règle de la charte ; pour un message d'enfant, c'est son relais qui est prévenu. Un enfant ne reçoit jamais d'e-mail.
+- **Signalements** : le bureau pose ou retire un signalement manuel (`POST /api/moderation/messages/:id/flag`). Le signalement par le relais arrive avec les sessions élèves.
+
 ## Tests de bout en bout du web
 
 `npm run test:e2e -w @parrainage/web` construit puis lance l'API (port 4100) et le web (port 3100), à côté d'un éventuel `npm run dev` (3000 et 4000). Les services Docker doivent tourner (PostgreSQL et Mailpit).
 
-- Par défaut (`E2E_DB=seed`), la base de développement n'est **pas effacée** : les migrations en attente sont appliquées (`db:deploy`) puis le seed est rejoué (idempotent : comptes et mots de passe de démonstration rétablis, sessions et compteurs de tentatives conservés). Relancer la suite moins de 5 minutes plus tard peut donc atteindre la limite d'envoi de liens magiques.
+- Par défaut (`E2E_DB=seed`), la base de développement n'est **pas effacée** : les migrations en attente sont appliquées (`db:deploy`) puis le seed est rejoué (idempotent : comptes et mots de passe de démonstration rétablis, sessions et compteurs de tentatives conservés). Seuls les messages ajoutés à la main dans les conversations de démonstration sont effacés (`SEED_RESET_MESSAGES=1`), car les tests comparent ces conversations à la maquette ; `npm run db:seed` seul les conserve. Relancer la suite moins de 5 minutes plus tard peut donc atteindre la limite d'envoi de liens magiques.
 - `E2E_DB=reset` efface d'abord la base (`npm run db:reset`) pour repartir de zéro.
 - Horloge figée sur le jour du design (`apps/web/e2e/clock.ts`) : l'API de test démarre avec `APP_NOW=2026-10-31T10:00:00Z` et le seed est rejoué avec `SEED_TODAY=2026-10-31`. Après la suite, les dates de la base de développement partent donc du 31 octobre 2026 ; `npm run db:seed` les recale sur aujourd'hui.
 - `E2E_PORT` et `E2E_API_PORT` changent les ports si 3100 ou 4100 sont pris.
+- `e2e/moderation.spec.ts` prend de vraies décisions : il rejoue le seed avant et après chaque projet.
 - `e2e/messaging.spec.ts` rejoue le seed avant chaque projet (non-lus de la maquette) et préfixe ses clés d'envoi par `e2e-` : le seed supprime ces messages au lancement suivant. La caméra et le micro sont simulés par Chromium (`--use-fake-device-for-media-stream`).
 - Le build du web est construit pour l'origine des tests (`NEXT_PUBLIC_APP_URL=http://localhost:3100`) : relancez `npm run build` avant un `npm run start` sur le port 3000.
 

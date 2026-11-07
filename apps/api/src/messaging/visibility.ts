@@ -1,4 +1,8 @@
-import type { ConversationAccess, MessageStatus } from "@parrainage/contracts";
+import {
+  type ConversationAccess,
+  MASKED_PLACEHOLDER,
+  type MessageStatus,
+} from "@parrainage/contracts";
 import type { Actor } from "../auth/actor.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import type {
@@ -178,8 +182,6 @@ export function messageStatus(message: {
       return message.deliveryStatus === "RECEIVED" ? "lu" : "remis";
   }
 }
-
-export const MASKED_PLACEHOLDER = "[masqué par l'association]";
 
 /**
  * Texte montré à l'acteur. Un message masqué n'est montré que dans sa version masquée (à son

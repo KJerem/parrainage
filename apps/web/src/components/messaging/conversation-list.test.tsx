@@ -131,6 +131,33 @@ describe("MessageItem", () => {
     ).toBeTruthy();
   });
 
+  it("donne le motif d'un passage masqué à l'auteur, et rien aux autres", () => {
+    const { rerender } = render(
+      <MessageItem
+        message={message({
+          status: "remis",
+          masked: true,
+          moderationReason: "Contact direct hors plateforme",
+        })}
+        recipient="Aïcha"
+        srIntro=""
+      />,
+    );
+    expect(
+      screen.getByText(
+        "Un passage a été masqué par l'association : Contact direct hors plateforme.",
+      ),
+    ).toBeTruthy();
+    rerender(
+      <MessageItem
+        message={message({ side: "them", status: null, masked: true, moderationReason: null })}
+        recipient="Aïcha"
+        srIntro=""
+      />,
+    );
+    expect(screen.getByText("Un passage a été masqué par l'association.")).toBeTruthy();
+  });
+
   it("montre les pièces jointes : photo de démonstration et bulletin à télécharger", () => {
     render(
       <MessageItem

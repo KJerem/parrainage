@@ -7,7 +7,8 @@ import { E2E_SEED_TODAY } from "./clock";
  *
  * E2E_DB=seed (par défaut) : migrations en attente appliquées (`db:deploy`, sans perte de données)
  * puis `db:seed`, idempotent : comptes et mots de passe du seed rétablis, données ajoutées à la
- * main conservées.
+ * main conservées, sauf les messages ajoutés dans les conversations de démonstration
+ * (SEED_RESET_MESSAGES) : les tests les comparent à la maquette.
  * E2E_DB=reset : `npm run db:reset`, la base est effacée puis recréée (à lancer soi-même).
  *
  * Dans les deux cas, le seed est calé sur le jour du design (SEED_TODAY, e2e/clock.ts), comme
@@ -24,7 +25,7 @@ export default function globalSetup() {
       : "npm run db:reset -w @parrainage/api";
   execSync(command, {
     cwd: path.join(__dirname, "..", "..", ".."),
-    env: { ...process.env, SEED_TODAY: E2E_SEED_TODAY },
+    env: { ...process.env, SEED_TODAY: E2E_SEED_TODAY, SEED_RESET_MESSAGES: "1" },
     stdio: "inherit",
   });
 }
@@ -36,7 +37,7 @@ export default function globalSetup() {
 export function reseed() {
   execSync("npm run db:seed -w @parrainage/api", {
     cwd: path.join(__dirname, "..", "..", ".."),
-    env: { ...process.env, SEED_TODAY: E2E_SEED_TODAY },
+    env: { ...process.env, SEED_TODAY: E2E_SEED_TODAY, SEED_RESET_MESSAGES: "1" },
     stdio: "pipe",
   });
 }

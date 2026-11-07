@@ -42,4 +42,16 @@ export const relaisRoutes: { path: string; title: string }[] = [
   { path: "/relais/messages", title: "Messages" },
   { path: "/relais/messages?onglet=bureau", title: "Messages" },
   { path: `/relais/messages/${CLAIRE_KOFFI_CONVERSATION}`, title: "Conversation avec Claire M." },
+  { path: "/relais/enfants/nouveau", title: "Rubrique à venir" },
+];
+
+// Pages de l'espace bureau, vérifiées connecté (axe, débordement).
+export const bureauRoutes: { path: string; title: string }[] = [
+  { path: "/bureau", title: "Vue d'ensemble" },
+  { path: "/bureau?filtre=signales", title: "Vue d'ensemble (signalés)" },
+  { path: "/bureau/moderation", title: "Modération" },
+  { path: "/bureau/moderation/seed-message-attente-paul", title: "Message avec alerte" },
+  { path: "/bureau/moderation/seed-message-attente-mariam", title: "Message avec vidéo" },
+  { path: "/bureau/moderation/seed-message-attente-aicha", title: "Message avec bulletin" },
+  { path: "/bureau/binomes", title: "Rubrique à venir" },
 ];
