@@ -1,19 +1,15 @@
 "use client";
 
 import {
-  createdNewsSchema,
   initials,
-  mediaPath,
   NEWS_MAX_MEDIA,
   newsPostTypeLabels,
   newsPostTypes,
-  type NewsPostType,
   type RelaisChildRow,
   type ScheduledNews,
-  type UploadedMedia,
 } from "@parrainage/contracts";
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { z } from "zod";
 import {
   Avatar,
@@ -23,21 +19,17 @@ import {
   Dialog,
   FormField,
   Input,
-  Notice,
   PlayCircleIcon,
   SegmentedControl,
   Textarea,
   toast,
 } from "@/components/ui";
-import {
-  ApiRequestError,
-  apiFetch,
-  NETWORK_ERROR_MESSAGE,
-  newIdempotencyKey,
-} from "@/lib/api-client";
+import { ApiRequestError, apiFetch, NETWORK_ERROR_MESSAGE } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
-import { formatDuration, formatLongDate, formatClock, RELAIS_TIME_ZONE } from "@/lib/format";
-import { useMediaUpload } from "./use-media-upload";
+import { formatClock, formatLongDate, RELAIS_TIME_ZONE } from "@/lib/format";
+import { ConsentNotice } from "./consent-notice";
+import { PublishFormMobile } from "./publish-form-mobile";
+import { type PublishFormState, usePublishForm } from "./use-publish-form";
 
 const VISIBLE_CHIPS = 4;
 
@@ -50,8 +42,8 @@ function toLocalInput(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-/** RW-Publier : à gauche le formulaire, à droite l'aperçu de ce que verront les parrains. */
-export function PublishForm({
+/** L'état et les envois sont ici ; les variantes web et mobile ne font qu'afficher (CSS). */
+export function PublishScreen({
   followed,
   scheduled,
   relaisName,
@@ -59,7 +51,6 @@ export function PublishForm({
   initialChildId,
   now,
 }: {
-  /** Enfants suivis du relais (dossier envoyé ou validé). */
   followed: readonly RelaisChildRow[];
   scheduled: readonly ScheduledNews[];
   relaisName: string;
@@ -67,100 +58,109 @@ export function PublishForm({
   initialChildId: string | null;
   now: string;
 }) {
-  const router = useRouter();
-  const [, startTransition] = useTransition();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const keyRef = useRef<string | null>(null);
-
-  const initial = followed.find((child) => child.id === initialChildId);
-  const [type, setType] = useState<NewsPostType>(initial ? "ONE_CHILD" : "SEVERAL_CHILDREN");
-  const [childIds, setChildIds] = useState<readonly string[]>(initial ? [initial.id] : []);
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [media, setMedia] = useState<readonly UploadedMedia[]>([]);
-  const [notifyParrains, setNotifyParrains] = useState(true);
-  const [notifyBureau, setNotifyBureau] = useState(true);
-  const [visibleToChildren, setVisibleToChildren] = useState(false);
-  const [picking, setPicking] = useState(false);
+  const form = usePublishForm({ followed, initialChildId });
+  const [picking, setPicking] = useState<"web" | "mobile" | null>(null);
   const [scheduling, setScheduling] = useState(false);
   const [scheduleAt, setScheduleAt] = useState("");
-  const [sending, setSending] = useState<"now" | "later" | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Readonly<Record<string, readonly string[]>>>({});
-  const [error, setError] = useState<string | null>(null);
 
-  const upload = useMediaUpload("news");
+  return (
+    <>
+      <div className="hidden md:contents">
+        <PublishFormWeb
+          form={form}
+          followed={followed}
+          scheduled={scheduled}
+          relaisName={relaisName}
+          relaisCity={relaisCity}
+          onPick={() => setPicking("web")}
+          onSchedule={() => {
+            const tomorrow = new Date(new Date(now).getTime() + 24 * 3600 * 1000);
+            tomorrow.setHours(9, 0, 0, 0);
+            setScheduleAt(toLocalInput(tomorrow));
+            setScheduling(true);
+          }}
+        />
+      </div>
+      <div className="contents md:hidden">
+        <PublishFormMobile form={form} followed={followed} onPick={() => setPicking("mobile")} />
+      </div>
 
-  const selected = useMemo(
-    () =>
-      type === "RELAIS_LIFE" ? followed : followed.filter((child) => childIds.includes(child.id)),
-    [followed, childIds, type],
+      {picking ? (
+        <ChildPicker
+          options={followed}
+          single={picking === "web" && form.type === "ONE_CHILD"}
+          selected={form.childIds}
+          onClose={() => setPicking(null)}
+          onConfirm={(ids) => {
+            if (picking === "mobile") {
+              form.chooseChildren(ids);
+            } else {
+              form.setChildIds(ids);
+            }
+            setPicking(null);
+          }}
+        />
+      ) : null}
+
+      <Dialog
+        open={scheduling}
+        onOpenChange={setScheduling}
+        title="Programmer la nouvelle"
+        description="Elle paraîtra à cette date, et les parrains seront prévenus à ce moment-là."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setScheduling(false)}>
+              Annuler
+            </Button>
+            <Button
+              loading={form.sending === "later"}
+              disabled={scheduleAt === ""}
+              onClick={() => {
+                void form.publish(new Date(scheduleAt).toISOString(), {
+                  onDone: () => setScheduling(false),
+                });
+              }}
+            >
+              Programmer
+            </Button>
+          </>
+        }
+      >
+        <FormField
+          label="Date et heure de parution"
+          error={form.errorsOf("scheduledAt") ?? (scheduling ? form.error : null)}
+        >
+          <Input
+            type="datetime-local"
+            value={scheduleAt}
+            onChange={(event) => setScheduleAt(event.target.value)}
+          />
+        </FormField>
+      </Dialog>
+    </>
   );
-  const parrainCount = new Set(selected.flatMap((child) => child.parrainIds)).size;
-  const withoutConsent = selected.filter((child) => !child.consentMedia);
+}
 
-  function changeType(next: NewsPostType) {
-    setType(next);
-    if (next === "ONE_CHILD") {
-      setChildIds((ids) => ids.slice(0, 1));
-    }
-  }
-
-  async function addFiles(files: FileList) {
-    const room = NEWS_MAX_MEDIA - media.length;
-    for (const file of [...files].slice(0, room)) {
-      const uploaded = await upload.upload(file);
-      if (uploaded) {
-        setMedia((list) => [...list, uploaded]);
-      }
-    }
-  }
-
-  async function publish(scheduledAt: string | null) {
-    setSending(scheduledAt ? "later" : "now");
-    setError(null);
-    setFieldErrors({});
-    // Gardée d'un essai à l'autre : un nouvel essai ne publie pas deux fois.
-    keyRef.current ??= newIdempotencyKey();
-    try {
-      const { data } = await apiFetch("/api/relais/news", createdNewsSchema, {
-        method: "POST",
-        body: {
-          type,
-          childIds: type === "RELAIS_LIFE" ? [] : childIds,
-          title,
-          body,
-          mediaIds: media.map((item) => item.id),
-          notifyParrains,
-          notifyBureau,
-          visibleToChildren,
-          scheduledAt,
-          idempotencyKey: keyRef.current,
-        },
-      });
-      keyRef.current = null;
-      toast(data.status === "SCHEDULED" ? "Nouvelle programmée" : "Nouvelle publiée");
-      startTransition(() => {
-        router.push(data.status === "SCHEDULED" ? "/relais/publier" : "/relais");
-        router.refresh();
-      });
-      if (data.status === "SCHEDULED") {
-        setTitle("");
-        setBody("");
-        setMedia([]);
-        setChildIds([]);
-        setScheduling(false);
-        setSending(null);
-      }
-    } catch (caught) {
-      setError(errorMessage(caught));
-      if (caught instanceof ApiRequestError) {
-        setFieldErrors(caught.fieldErrors);
-      }
-      setSending(null);
-    }
-  }
-
-  const errorsOf = (field: string) => fieldErrors[field]?.join(" ");
+/** RW-Publier : à gauche le formulaire, à droite l'aperçu de ce que verront les parrains. */
+function PublishFormWeb({
+  form,
+  followed,
+  scheduled,
+  relaisName,
+  relaisCity,
+  onPick,
+  onSchedule,
+}: {
+  form: PublishFormState;
+  followed: readonly RelaisChildRow[];
+  scheduled: readonly ScheduledNews[];
+  relaisName: string;
+  relaisCity: string;
+  onPick: () => void;
+  onSchedule: () => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const { selected, media, parrainCount, withoutConsent, errorsOf, sending, uploading } = form;
   const busy = sending !== null;
   const shownChips = selected.slice(0, VISIBLE_CHIPS);
   const previewTiles = media.slice(0, 3);
@@ -173,7 +173,7 @@ export function PublishForm({
           noValidate
           onSubmit={(event) => {
             event.preventDefault();
-            void publish(null);
+            void form.publish(null);
           }}
           className="flex min-w-0 flex-col gap-5 rounded-16 border border-line bg-white p-6 max-sm:p-4"
         >
@@ -183,8 +183,8 @@ export function PublishForm({
             </span>
             <SegmentedControl
               aria-labelledby="type-nouvelle"
-              value={type}
-              onValueChange={changeType}
+              value={form.type}
+              onValueChange={form.changeType}
               options={newsPostTypes.map((value) => ({
                 value,
                 label: newsPostTypeLabels[value],
@@ -192,7 +192,7 @@ export function PublishForm({
             />
           </div>
 
-          {type === "RELAIS_LIFE" ? (
+          {form.type === "RELAIS_LIFE" ? (
             <p className="m-0 text-14 text-ink-soft">
               La nouvelle concerne les {followed.length} enfants suivis par votre relais.
             </p>
@@ -210,7 +210,7 @@ export function PublishForm({
                       type="button"
                       aria-label={`Retirer ${child.name}`}
                       onClick={() =>
-                        setChildIds((ids) => ids.filter((value) => value !== child.id))
+                        form.setChildIds(form.childIds.filter((value) => value !== child.id))
                       }
                       className="flex size-6 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-current"
                     >
@@ -225,7 +225,7 @@ export function PublishForm({
                 ) : null}
                 <button
                   type="button"
-                  onClick={() => setPicking(true)}
+                  onClick={onPick}
                   className="inline-flex min-h-9 cursor-pointer items-center rounded-18 border border-dashed border-line-strong bg-white px-3 text-13 font-semibold text-ink pointer-coarse:min-h-11"
                 >
                   + Ajouter
@@ -237,75 +237,60 @@ export function PublishForm({
             </div>
           )}
 
-          {withoutConsent.length > 0 ? (
-            <Notice size="sm" title="Sans autorisation pour les photos et vidéos">
-              {withoutConsent
-                .slice(0, 5)
-                .map((child) => child.name)
-                .join(", ")}
-              {withoutConsent.length > 5 ? ` et ${withoutConsent.length - 5} de plus` : ""} : leurs
-              parrains liront le texte, sans les photos ni les vidéos.
-            </Notice>
-          ) : null}
+          {withoutConsent.length > 0 ? <ConsentNotice childrenWithout={withoutConsent} /> : null}
 
           <FormField label="Titre" error={errorsOf("title")}>
-            <Input value={title} onChange={(event) => setTitle(event.target.value)} />
+            <Input value={form.title} onChange={(event) => form.setTitle(event.target.value)} />
           </FormField>
           <FormField
             label="Message aux parrains"
             hint="Astuce : vous pouvez dicter le texte avec le micro de votre téléphone."
             error={errorsOf("body")}
           >
-            <Textarea rows={5} value={body} onChange={(event) => setBody(event.target.value)} />
+            <Textarea
+              rows={5}
+              value={form.body}
+              onChange={(event) => form.setBody(event.target.value)}
+            />
           </FormField>
 
           <div className="flex flex-col gap-2">
             <span className="text-14 font-semibold">Photos et vidéos</span>
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-              {media.map((item) => {
-                const src = mediaPath(item);
-                return (
-                  <div
-                    key={item.id}
-                    className="relative flex aspect-square items-center justify-center overflow-hidden rounded-12 bg-brand-100 text-12 font-semibold text-brand-700"
+              {media.map((item) => (
+                <div
+                  key={item.localId}
+                  className="relative flex aspect-square items-center justify-center overflow-hidden rounded-12 bg-brand-100 text-12 font-semibold text-brand-700"
+                >
+                  {item.kind === "VIDEO" ? (
+                    <span className="flex size-full items-center justify-center gap-1.5 bg-brand-700 px-1 text-white">
+                      <PlayCircleIcon size={18} />
+                      Vidéo
+                    </span>
+                  ) : item.previewUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- aperçu local du fichier.
+                    <img src={item.previewUrl} alt="Photo" className="size-full object-cover" />
+                  ) : (
+                    "Fichier"
+                  )}
+                  <button
+                    type="button"
+                    aria-label="Retirer ce fichier"
+                    onClick={() => form.removeMedia(item.localId)}
+                    className="absolute top-1 right-1 flex size-7 cursor-pointer items-center justify-center rounded-full border-0 bg-white text-ink"
                   >
-                    {item.kind === "VIDEO" ? (
-                      <span className="flex size-full items-center justify-center gap-1.5 bg-brand-700 px-1 text-white">
-                        <PlayCircleIcon size={18} />
-                        Vidéo
-                        {item.durationSec !== null ? ` ${formatDuration(item.durationSec)}` : ""}
-                      </span>
-                    ) : src ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- URL présignée de courte durée.
-                      <img
-                        src={src}
-                        alt={item.label ?? "Photo"}
-                        className="size-full object-cover"
-                      />
-                    ) : (
-                      "Photo"
-                    )}
-                    <button
-                      type="button"
-                      aria-label="Retirer ce fichier"
-                      onClick={() =>
-                        setMedia((list) => list.filter((value) => value.id !== item.id))
-                      }
-                      className="absolute top-1 right-1 flex size-7 cursor-pointer items-center justify-center rounded-full border-0 bg-white text-ink"
-                    >
-                      <CloseIcon size={14} />
-                    </button>
-                  </div>
-                );
-              })}
+                    <CloseIcon size={14} />
+                  </button>
+                </div>
+              ))}
               {media.length < NEWS_MAX_MEDIA ? (
                 <button
                   type="button"
-                  disabled={upload.uploading}
+                  disabled={uploading}
                   onClick={() => fileRef.current?.click()}
                   className="flex aspect-square cursor-pointer items-center justify-center rounded-12 border-2 border-dashed border-line-strong bg-canvas px-1 text-13 font-semibold text-ink-soft"
                 >
-                  {upload.uploading ? "Envoi en cours…" : "+ Ajouter"}
+                  {uploading ? "Envoi en cours…" : "+ Ajouter"}
                 </button>
               ) : null}
             </div>
@@ -318,7 +303,7 @@ export function PublishForm({
               data-testid="medias-nouvelle"
               onChange={(event) => {
                 if (event.target.files) {
-                  void addFiles(event.target.files);
+                  void form.addFiles(event.target.files);
                 }
                 event.target.value = "";
               }}
@@ -326,9 +311,9 @@ export function PublishForm({
             <span className="text-13 text-muted">
               Les photos sont allégées avant l&apos;envoi. Vidéos : 25 Mo et 2 minutes au plus.
             </span>
-            {upload.error ? (
+            {form.uploadError ? (
               <p role="alert" className="m-0 text-13 font-semibold text-danger-600">
-                {upload.error}
+                {form.uploadError}
               </p>
             ) : null}
           </div>
@@ -344,18 +329,18 @@ export function PublishForm({
                       ? "Les parrains concernés"
                       : `Les ${parrainCount} parrains concernés`
                 }
-                checked={notifyParrains}
-                onChange={(event) => setNotifyParrains(event.target.checked)}
+                checked={form.notifyParrains}
+                onChange={(event) => form.setNotifyParrains(event.target.checked)}
               />
               <Checkbox
                 label="Le bureau de l'association"
-                checked={notifyBureau}
-                onChange={(event) => setNotifyBureau(event.target.checked)}
+                checked={form.notifyBureau}
+                onChange={(event) => form.setNotifyBureau(event.target.checked)}
               />
               <Checkbox
                 label="Les enfants (visible à leur prochaine session)"
-                checked={visibleToChildren}
-                onChange={(event) => setVisibleToChildren(event.target.checked)}
+                checked={form.visibleToChildren}
+                onChange={(event) => form.setVisibleToChildren(event.target.checked)}
               />
             </div>
             {errorsOf("notifyParrains") ? (
@@ -365,9 +350,9 @@ export function PublishForm({
             ) : null}
           </fieldset>
 
-          {error ? (
+          {form.error ? (
             <p role="alert" className="m-0 text-14 font-semibold text-danger-600">
-              {error}
+              {form.error}
             </p>
           ) : null}
           <div className="flex flex-wrap gap-2.5 max-sm:flex-col max-sm:*:w-full">
@@ -377,21 +362,11 @@ export function PublishForm({
               type="submit"
               className="px-6 font-extrabold"
               loading={sending === "now"}
-              disabled={busy || upload.uploading}
+              disabled={busy || uploading}
             >
               Publier
             </Button>
-            <Button
-              size="xl"
-              variant="secondary"
-              disabled={busy || upload.uploading}
-              onClick={() => {
-                const tomorrow = new Date(new Date(now).getTime() + 24 * 3600 * 1000);
-                tomorrow.setHours(9, 0, 0, 0);
-                setScheduleAt(toLocalInput(tomorrow));
-                setScheduling(true);
-              }}
-            >
+            <Button size="xl" variant="secondary" disabled={busy || uploading} onClick={onSchedule}>
               Programmer
             </Button>
           </div>
@@ -412,84 +387,38 @@ export function PublishForm({
               </div>
             </div>
             <strong className="text-16 [overflow-wrap:anywhere]">
-              {title.trim() || "Titre de la nouvelle"}
+              {form.title.trim() || "Titre de la nouvelle"}
             </strong>
             <p className="m-0 text-14 leading-[1.5] [overflow-wrap:anywhere] whitespace-pre-line">
-              {body.trim() || "Le message aux parrains s'affichera ici."}
+              {form.body.trim() || "Le message aux parrains s'affichera ici."}
             </p>
             {previewTiles.length > 0 ? (
               <div className="grid grid-cols-3 gap-1.5">
-                {previewTiles.map((item) => {
-                  const src = item.kind === "VIDEO" ? null : mediaPath(item);
-                  return src ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- URL présignée de courte durée.
+                {previewTiles.map((item) =>
+                  item.previewUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- aperçu local du fichier.
                     <img
-                      key={item.id}
-                      src={src}
+                      key={item.localId}
+                      src={item.previewUrl}
                       alt=""
                       className="h-20 w-full rounded-8 bg-brand-100 object-cover"
                     />
                   ) : (
                     <div
-                      key={item.id}
+                      key={item.localId}
                       className={cn(
                         "h-20 rounded-8",
                         item.kind === "VIDEO" ? "bg-brand-700" : "bg-brand-100",
                       )}
                     />
-                  );
-                })}
+                  ),
+                )}
               </div>
             ) : null}
           </article>
           {scheduled.length > 0 ? <ScheduledList items={scheduled} /> : null}
         </aside>
       </div>
-
-      {picking ? (
-        <ChildPicker
-          options={followed}
-          single={type === "ONE_CHILD"}
-          selected={childIds}
-          onClose={() => setPicking(false)}
-          onConfirm={(ids) => {
-            setChildIds(ids);
-            setPicking(false);
-          }}
-        />
-      ) : null}
-
-      <Dialog
-        open={scheduling}
-        onOpenChange={setScheduling}
-        title="Programmer la nouvelle"
-        description="Elle paraîtra à cette date, et les parrains seront prévenus à ce moment-là."
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setScheduling(false)}>
-              Annuler
-            </Button>
-            <Button
-              loading={sending === "later"}
-              disabled={scheduleAt === ""}
-              onClick={() => void publish(new Date(scheduleAt).toISOString())}
-            >
-              Programmer
-            </Button>
-          </>
-        }
-      >
-        <FormField
-          label="Date et heure de parution"
-          error={errorsOf("scheduledAt") ?? (scheduling ? error : null)}
-        >
-          <Input
-            type="datetime-local"
-            value={scheduleAt}
-            onChange={(event) => setScheduleAt(event.target.value)}
-          />
-        </FormField>
-      </Dialog>
     </>
   );
 }

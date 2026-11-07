@@ -12,8 +12,10 @@ export default async function RelaisChildrenPage() {
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="m-0 text-30 font-extrabold max-sm:text-24">Enfants</h1>
-        <Button href="/relais/enfants/nouveau">Ajouter un enfant</Button>
+        <h1 className="m-0 hidden text-30 font-extrabold md:block">Enfants</h1>
+        <Button href="/relais/enfants/nouveau" className="max-md:w-full">
+          Ajouter un enfant
+        </Button>
       </div>
       <section
         aria-labelledby="liste-enfants"

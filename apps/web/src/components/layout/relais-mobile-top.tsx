@@ -18,7 +18,32 @@ function subHeaderOf(pathname: string): SubHeader | null {
   if (pathname === "/relais/messages") {
     return { title: "Messages", backHref: "/relais", backLabel: "Retour à l'accueil" };
   }
-  return null;
+  const toHome = (title: string): SubHeader => ({
+    title,
+    backHref: "/relais",
+    backLabel: "Retour à l'accueil",
+  });
+  const toChildren = (title: string): SubHeader => ({
+    title,
+    backHref: "/relais/enfants",
+    backLabel: "Retour aux enfants",
+  });
+  if (pathname === "/relais/enfants/nouveau") {
+    return toChildren("Ajouter un enfant");
+  }
+  if (pathname.startsWith("/relais/enfants/")) {
+    return toChildren("Fiche de l'enfant");
+  }
+  const titles: Readonly<Record<string, string>> = {
+    "/relais/enfants": "Enfants",
+    "/relais/publier": "Nouvelle publication",
+    "/relais/resultats": "Saisir des résultats",
+    "/relais/profil": "Profil",
+    "/relais/notifications": "Notifications",
+    "/relais/sessions": "Sessions élèves",
+  };
+  const title = titles[pathname];
+  return title ? toHome(title) : null;
 }
 
 /**

@@ -1,4 +1,5 @@
 import { LOGOUT_ACTION } from "@/components/layout/nav-config";
+import { SignOutForm } from "@/components/layout/sign-out-form";
 import { Button, type ButtonAsButtonProps } from "@/components/ui/button";
 
 export type LogoutButtonProps = Omit<ButtonAsButtonProps, "type" | "children"> & {
@@ -14,10 +15,10 @@ export function LogoutButton({
   ...props
 }: LogoutButtonProps) {
   return (
-    <form method="post" action={LOGOUT_ACTION} className={formClassName}>
+    <SignOutForm action={LOGOUT_ACTION} className={formClassName}>
       <Button type="submit" variant={variant} {...props}>
         {label}
       </Button>
-    </form>
+    </SignOutForm>
   );
 }

@@ -1,0 +1,21 @@
+{
+  "name": "Parrainage LRT : espace relais",
+  "short_name": "LRT Relais",
+  "description": "Publier des nouvelles et saisir les résultats, même sans réseau.",
+  "lang": "fr",
+  "start_url": "/relais",
+  "scope": "/relais",
+  "display": "standalone",
+  "background_color": "#f3f5f4",
+  "theme_color": "#1e5c4e",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

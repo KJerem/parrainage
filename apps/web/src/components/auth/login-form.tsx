@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { FormField, Input } from "@/components/ui/form-field";
 import { authClient } from "@/lib/auth-client";
+import { forgetOfflinePages } from "@/lib/offline-purge";
 import {
   authErrorMessage,
   authMessages,
@@ -38,6 +39,11 @@ const headingClass = "m-0 text-28 font-extrabold outline-none";
  * session soit posé sur l'origine du web.
  */
 export function LoginForm({ next, subtitle, linkError }: LoginFormProps) {
+  // Arriver ici, c'est ne plus être connecté : les pages gardées hors ligne s'en vont.
+  useEffect(() => {
+    void forgetOfflinePages();
+  }, []);
+
   const router = useRouter();
   const [mode, setMode] = useState<Mode>(linkError ? "magic" : "password");
   const [email, setEmail] = useState("");

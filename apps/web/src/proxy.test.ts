@@ -51,7 +51,7 @@ describe("matcher du proxy", () => {
     "/_next/image",
     "/favicon.ico",
     "/sw.js",
-    "/manifest.webmanifest",
+    "/relais.webmanifest",
     "/icons/192.png",
     "/dev/ui/parrain",
   ])("exclut %s", (path) => {

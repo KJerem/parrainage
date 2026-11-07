@@ -23,6 +23,8 @@ export default defineConfig({
   use: {
     baseURL,
     trace: "retain-on-failure",
+    // Installer le service worker à chaque test coûterait cher : seul offline.spec.ts l'autorise.
+    serviceWorkers: "block",
   },
   // Builds de production des deux serveurs. Le web est construit pour l'origine des tests :
   // l'API la déclare de confiance (APP_URL) et bâtit les liens des e-mails à partir d'elle.

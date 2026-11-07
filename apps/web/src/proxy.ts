@@ -17,6 +17,6 @@ export function proxy(request: NextRequest) {
 export const config = {
   // Ni l'API (réécrite vers NestJS), ni les fichiers statiques, ni le guide de style.
   matcher: [
-    "/((?!api(?:/|$)|_next/static|_next/image|favicon\\.ico|sw\\.js|manifest\\.webmanifest|icons/|dev/ui).*)",
+    "/((?!api(?:/|$)|_next/static|_next/image|favicon\\.ico|sw\\.js|relais\\.webmanifest|icons/|dev/ui).*)",
   ],
 };

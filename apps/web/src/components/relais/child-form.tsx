@@ -14,13 +14,10 @@ import {
   type RelaisChildDetail,
   saveChildResultSchema,
   type School,
-  schoolLevelLabels,
   schoolLevels,
-  type SchoolLevel,
-  schoolSchema,
 } from "@parrainage/contracts";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useId, useRef, useState, useTransition } from "react";
+import { type FormEvent, useRef, useState, useTransition } from "react";
 import {
   ArrowLeftIcon,
   Avatar,
@@ -37,6 +34,7 @@ import {
 import { ApiRequestError, apiFetch, NETWORK_ERROR_MESSAGE } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { ChildCodeCard, ChildCodeImages } from "./child-code";
+import { AddSchoolDialog } from "./schools-card";
 import { childFileStatusLabels, childSummaryLabel } from "./relais-labels";
 import { useMediaUpload } from "./use-media-upload";
 
@@ -71,7 +69,6 @@ export function ChildForm({
   const [, startTransition] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
   const consentFileRef = useRef<HTMLInputElement>(null);
-  const titleId = useId();
 
   const [firstName, setFirstName] = useState(child?.firstName ?? "");
   const [lastInitial, setLastInitial] = useState(child?.lastInitial ?? "");
@@ -210,21 +207,29 @@ export function ChildForm({
           href={child ? "/relais/enfants" : "/relais"}
           variant="ghost"
           leftIcon={<ArrowLeftIcon size={18} />}
-          className="-ml-3.5"
+          className="-ml-3.5 max-md:hidden"
         >
           Retour
         </Button>
         <div className="flex flex-wrap items-center gap-3">
-          <h1 id={titleId} className="m-0 text-30 font-extrabold max-sm:text-24">
+          {/* Sous md, le sous-en-tête porte le titre de la page : celui-ci n'y est plus un h1. */}
+          <h1 className="m-0 text-30 font-extrabold max-md:hidden">
             {child ? `${child.firstName} ${child.lastInitial}.` : "Ajouter un enfant"}
           </h1>
-          {child ? <Chip size="md">{childFileStatusLabels[child.fileStatus]}</Chip> : null}
+          {child ? (
+            <>
+              <strong className="text-18 md:hidden">
+                {child.firstName} {child.lastInitial}.
+              </strong>
+              <Chip size="md">{childFileStatusLabels[child.fileStatus]}</Chip>
+            </>
+          ) : null}
         </div>
       </div>
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
         <form
-          aria-labelledby={titleId}
+          aria-label={child ? `Fiche de ${child.firstName}` : "Ajouter un enfant"}
           noValidate
           onSubmit={onSubmit}
           className="flex min-w-0 flex-col gap-5"
@@ -615,66 +620,5 @@ function CodeReset({ child, name }: { child: RelaisChildDetail; name: string }) 
         ) : null}
       </Dialog>
     </div>
-  );
-}
-
-function AddSchoolDialog({
-  onClose,
-  onCreated,
-}: {
-  onClose: () => void;
-  onCreated: (school: School) => void;
-}) {
-  const [shortName, setShortName] = useState("");
-  const [level, setLevel] = useState<SchoolLevel>("PRIMAIRE");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function create() {
-    setBusy(true);
-    setError(null);
-    try {
-      const { data } = await apiFetch("/api/relais/schools", schoolSchema, {
-        method: "POST",
-        body: { shortName, level },
-      });
-      onCreated(data);
-    } catch (caught) {
-      setError(errorMessage(caught));
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-      title="Ajouter une école"
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Annuler
-          </Button>
-          <Button loading={busy} onClick={() => void create()}>
-            Ajouter
-          </Button>
-        </>
-      }
-    >
-      <FormField label="Nom de l'école" error={error}>
-        <Input value={shortName} onChange={(event) => setShortName(event.target.value)} />
-      </FormField>
-      <FormField label="Niveau">
-        <Select value={level} onChange={(event) => setLevel(event.target.value as SchoolLevel)}>
-          {schoolLevels.map((option) => (
-            <option key={option} value={option}>
-              {schoolLevelLabels[option]}
-            </option>
-          ))}
-        </Select>
-      </FormField>
-    </Dialog>
   );
 }

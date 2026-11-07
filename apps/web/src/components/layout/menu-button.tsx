@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { SignOutForm } from "./sign-out-form";
 import type { MenuItem } from "./nav-config";
 
 const placements = {
@@ -156,7 +157,7 @@ export function MenuButton({
                     {item.label}
                   </Link>
                 ) : (
-                  <form method="post" action={item.action}>
+                  <SignOutForm action={item.action}>
                     <button
                       ref={ref}
                       type="submit"
@@ -166,7 +167,7 @@ export function MenuButton({
                     >
                       {item.label}
                     </button>
-                  </form>
+                  </SignOutForm>
                 )}
               </li>
             );

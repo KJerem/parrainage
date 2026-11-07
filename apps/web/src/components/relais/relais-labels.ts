@@ -1,9 +1,11 @@
 import {
   type ChildFileStatus,
   daysSince,
+  initials,
   newsFreshness,
   type NewsFreshness,
   type RelaisChildRow,
+  type RelaisHome,
   type ResultStatus,
 } from "@parrainage/contracts";
 import { formatAge } from "@/lib/format";
@@ -99,4 +101,110 @@ export function childSummaryLabel(
       .filter(Boolean)
       .join(" · ") || "À compléter"
   );
+}
+
+export type RelaisTodo = {
+  key: string;
+  kind: "stale" | "bulletins" | "drafts" | "messages";
+  title: string;
+  detail: string;
+  href: string;
+  /** Texte de la pastille : initiales ou nombre. */
+  badge: string;
+  tone: "danger" | "warning" | "info";
+};
+
+/**
+ * Ce qui demande l'attention du relais, calculé : enfants sans nouvelle depuis 60 jours (le plus
+ * ancien d'abord), bulletins à saisir, dossiers à finir, messages non lus.
+ */
+export function relaisTodos(home: RelaisHome): RelaisTodo[] {
+  const stale = home.children
+    .filter((child) => child.fileStatus === "VALIDATED" && child.lastNewsAt)
+    .map((child) => ({ child, days: daysSince(child.lastNewsAt!, home.now) }))
+    .filter(({ days }) => newsFreshness(days) === "stale")
+    .sort((a, b) => b.days - a.days)
+    .map(({ child, days }): RelaisTodo => ({
+      key: `stale-${child.id}`,
+      kind: "stale",
+      title: child.name,
+      detail: `Pas de nouvelle depuis ${days} jours`,
+      href: `/relais/publier?enfant=${encodeURIComponent(child.id)}`,
+      badge: initials(child.name),
+      tone: "danger",
+    }));
+  const { bulletinsToEnter, childCount, unreadMessages } = home.stats;
+  const bulletins: RelaisTodo[] =
+    bulletinsToEnter > 0 && home.bulletinsDue
+      ? [
+          {
+            key: "bulletins",
+            kind: "bulletins",
+            title: `Bulletins du ${home.bulletinsDue.label}`,
+            detail: `${bulletinsToEnter} ${bulletinsToEnter > 1 ? "enfants" : "enfant"} sur ${childCount} ${bulletinsToEnter > 1 ? "restent" : "reste"} à saisir`,
+            href: "/relais/resultats",
+            badge: String(bulletinsToEnter),
+            tone: "warning",
+          },
+        ]
+      : [];
+  const drafts: RelaisTodo[] =
+    home.draftCount > 0
+      ? [
+          {
+            key: "drafts",
+            kind: "drafts",
+            title: home.draftCount > 1 ? "Dossiers à terminer" : "Dossier à terminer",
+            detail: "Pas encore envoyé au bureau",
+            href: "/relais/enfants",
+            badge: String(home.draftCount),
+            tone: "info",
+          },
+        ]
+      : [];
+  const messages: RelaisTodo[] =
+    unreadMessages > 0
+      ? [
+          {
+            key: "messages",
+            kind: "messages",
+            title: unreadMessages > 1 ? "Messages non lus" : "Message non lu",
+            detail: "Dans vos conversations",
+            href: "/relais/messages",
+            badge: String(unreadMessages),
+            tone: "info",
+          },
+        ]
+      : [];
+  return [...messages, ...stale, ...bulletins, ...drafts];
+}
+
+const QUICK_CHILDREN = 3;
+
+/** « Publier pour Claire M. », « Publier pour 6 parrains ». */
+export function publishButtonLabel(selected: readonly RelaisChildRow[]): string {
+  const parrains = [...new Set(selected.flatMap((child) => child.parrains))];
+  if (parrains.length === 0) {
+    return "Publier";
+  }
+  return parrains.length === 1
+    ? `Publier pour ${parrains[0]}`
+    : `Publier pour ${parrains.length} parrains`;
+}
+
+/** Enfants proposés d'un geste : ceux qui attendent une nouvelle depuis le plus longtemps. */
+export function quickChildren(
+  followed: readonly RelaisChildRow[],
+  selectedIds: readonly string[],
+): RelaisChildRow[] {
+  const age = (child: RelaisChildRow) =>
+    child.lastNewsAt ? new Date(child.lastNewsAt).getTime() : 0;
+  const stalest = [...followed]
+    .filter((child) => child.parrains.length > 0)
+    .sort((a, b) => age(a) - age(b))
+    .slice(0, QUICK_CHILDREN);
+  const chosen = followed.filter(
+    (child) => selectedIds.includes(child.id) && !stalest.includes(child),
+  );
+  return [...chosen.slice(0, QUICK_CHILDREN), ...stalest].slice(0, QUICK_CHILDREN);
 }

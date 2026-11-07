@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PublishForm } from "@/components/relais/publish-form";
+import { PublishScreen } from "@/components/relais/publish-form";
 import { firstParam } from "@/lib/auth-paths";
 import { requireRole } from "@/lib/auth.server";
 import { getRelaisChildren, getScheduledNews } from "@/lib/relais.server";
@@ -11,7 +11,7 @@ export default async function RelaisPublishPage({ searchParams }: PageProps<"/re
   const me = await requireRole("relais");
   const [{ items, now }, scheduled] = await Promise.all([getRelaisChildren(), getScheduledNews()]);
   return (
-    <PublishForm
+    <PublishScreen
       // Un brouillon n'est pas encore un enfant suivi : il ne reçoit pas de nouvelle.
       followed={items.filter((child) => child.fileStatus !== "DRAFT")}
       scheduled={scheduled.items}

@@ -107,6 +107,16 @@ Toutes les routes `/api/relais/*` sont bornées aux enfants du relais connecté 
 - **Résultats** (`/relais/resultats?periode=&ecole=`) : une ligne par enfant, enregistrée d'elle-même 800 ms après la dernière frappe. Une donnée plus ancienne que l'enregistrée est refusée (409). Rien n'est visible des parrains avant « Envoyer aux parrains », et un résultat envoyé garde sa moyenne.
 - **Écoles** : ajoutées depuis le formulaire d'un enfant (`POST /api/relais/schools`).
 
+## Relais sur téléphone et hors ligne
+
+L'espace relais s'installe comme une application (`public/relais.webmanifest`, annoncé par le seul layout du relais). Sous md, l'accueil et la publication suivent les maquettes mobiles (`Relais`, `RM-Publier`) ; à partir de md, les maquettes web. Les deux variantes partagent le même état : seul le CSS choisit.
+
+- **Service worker** (`src/sw/sw.ts`, assemblé par `serwist build` après `next build`) : enregistré depuis le layout du relais, en production seulement, avec la portée `/relais`. Il précache les fichiers statiques et garde **deux pages seulement**, `/relais` et `/relais/publier`. Toute autre page du relais répond hors ligne par `/hors-ligne`. L'API, les médias et les autres espaces n'entrent jamais dans un cache.
+- **File d'attente** (`src/lib/outbox`, IndexedDB) : les publications et les saisies de résultats attendent le réseau, dans l'ordre, pour le compte connecté seulement. Une saisie remplace celle du même enfant encore en attente. Une publication garde sa clé d'idempotence : rejouée, elle n'est créée qu'une fois. L'envoi reprend au retour du réseau, à l'ouverture, au retour sur l'onglet et sur réponse de la sonde `/api/health?light`, un seul à la fois entre onglets (Web Locks).
+- **Déconnexion** : les caches, la file d'attente et le service worker sont effacés (avec un avertissement si des envois attendent). Le serveur demande aussi cet effacement (`Clear-Site-Data: "storage"`), même sans JavaScript.
+- **Saisie sur téléphone** : prise de vue directe (`capture`), photos allégées dans le navigateur, dictée par la Web Speech API en français ; sans elle, le micro du clavier est proposé.
+- **Test sur un vrai téléphone** : caméra, service worker et dictée exigent le HTTPS hors de `localhost`, donc un tunnel (`ngrok http 3000` par exemple), avec `NEXT_PUBLIC_APP_URL` et `APP_URL` réglés sur son adresse.
+
 ## Modération
 
 Le bureau relit chaque message échangé avec un enfant, sur `/bureau` (file et approbation sur place) et `/bureau/moderation` (file et message relu).
@@ -127,6 +137,7 @@ Le bureau relit chaque message échangé avec un enfant, sur `/bureau` (file et 
 - `E2E_DB=reset` efface d'abord la base (`npm run db:reset`) pour repartir de zéro.
 - Horloge figée sur le jour du design (`apps/web/e2e/clock.ts`) : l'API de test démarre avec `APP_NOW=2026-10-31T10:00:00Z` et le seed est rejoué avec `SEED_TODAY=2026-10-31`. Après la suite, les dates de la base de développement partent donc du 31 octobre 2026 ; `npm run db:seed` les recale sur aujourd'hui.
 - `E2E_PORT` et `E2E_API_PORT` changent les ports si 3100 ou 4100 sont pris.
+- Le service worker est bloqué dans les tests (`serviceWorkers: "block"`), sauf dans `e2e/offline.spec.ts`, qui coupe réellement le réseau.
 - `e2e/moderation.spec.ts` et `e2e/relais.spec.ts` écrivent vraiment : ils rejouent le seed avant et après chaque projet. Ce que les tests créent porte un marqueur (enfants et écoles « E2e… », clés « e2e-… ») : le seed le retire.
 - `e2e/messaging.spec.ts` rejoue le seed avant chaque projet (non-lus de la maquette) et préfixe ses clés d'envoi par `e2e-` : le seed supprime ces messages au lancement suivant. La caméra et le micro sont simulés par Chromium (`--use-fake-device-for-media-stream`).
 - Le build du web est construit pour l'origine des tests (`NEXT_PUBLIC_APP_URL=http://localhost:3100`) : relancez `npm run build` avant un `npm run start` sur le port 3000.

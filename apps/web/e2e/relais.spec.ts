@@ -46,6 +46,13 @@ async function openAs(browser: Browser, testInfo: TestInfo, storageState: string
   return { context, page: await context.newPage() };
 }
 
+/** « Nouvelles ce mois » sur l'accueil (visible à partir de md). */
+async function newsThisMonth(page: Page): Promise<number> {
+  await page.goto("/relais");
+  const tiles = await page.getByRole("region", { name: "Indicateurs" }).innerText();
+  return Number(/Nouvelles ce mois\s*(\d+)/.exec(tiles)?.[1]);
+}
+
 const photo = async (name: string, background: string) => ({
   name,
   mimeType: "image/png",
@@ -55,6 +62,7 @@ const photo = async (name: string, background: string) => ({
 });
 
 test("l'accueil reprend RW-Accueil, avec des valeurs calculées", async ({ page }) => {
+  test.skip(isMobile(), "Sous md, l'accueil est celui de Relais.dc.html (test ci-dessous)");
   await page.goto("/relais");
   if (!isMobile()) {
     await expect(page.getByRole("heading", { level: 1, name: "Bonjour M. Koffi" })).toBeVisible();
@@ -87,6 +95,153 @@ test("l'accueil reprend RW-Accueil, avec des valeurs calculées", async ({ page 
   await page.getByRole("searchbox", { name: "Rechercher un enfant" }).fill("aicha");
   await expect(childRow(page, "Aïcha S.")).toBeVisible();
   await expect(childRow(page, "Kofi A.")).toHaveCount(0);
+});
+
+test("l'accueil mobile reprend Relais.dc.html, et les enfants ont leurs cartes", async ({
+  page,
+}) => {
+  test.skip(!isMobile(), "Sous md seulement");
+  await page.goto("/relais");
+  await expect(page.getByRole("heading", { level: 1, name: "Bonjour M. Koffi" })).toBeVisible();
+  await expect(page.getByText("Relais · Lomé, quartier Bè")).toBeVisible();
+  const actions = page.getByRole("region", { name: "Actions rapides" });
+  for (const [name, href] of [
+    ["Publier une nouvelle", "/relais/publier"],
+    ["Ajouter un enfant", "/relais/enfants/nouveau"],
+    ["Saisir des résultats", "/relais/resultats"],
+    ["Écrire", "/relais/messages"],
+    ["Ouvrir une session élève", "/relais/sessions"],
+  ] as const) {
+    await expect(actions.getByRole("link", { name })).toHaveAttribute("href", href);
+  }
+  const todo = page.getByRole("region", { name: "À faire cette semaine" });
+  await expect(todo.getByRole("link", { name: /Pas de nouvelle depuis \d+ jours/ })).toHaveCount(2);
+  await expect(todo.getByRole("link", { name: /Bulletins du 1er trimestre/ })).toContainText(
+    "7 enfants sur 18 restent à saisir",
+  );
+  // En ligne et sans rien en attente : ni bandeau, ni liste.
+  await expect(page.getByText(/^Hors ligne/)).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "En attente d'envoi" })).toHaveCount(0);
+
+  const nav = page.getByRole("navigation", { name: "Navigation", exact: true });
+  await nav.getByRole("link", { name: "Enfants" }).click();
+  await expect(page).toHaveURL("/relais/enfants");
+  await expect(page.getByRole("heading", { level: 1, name: "Enfants" })).toBeVisible();
+  const kofi = childRow(page, "Kofi A.");
+  await expect(kofi).toContainText("Claire M. +1");
+  await expect(kofi).toContainText("64 jours");
+  await expect(childRow(page, "Esther N.")).toContainText("En attente de parrain");
+  await page.getByRole("searchbox", { name: "Rechercher un enfant" }).fill("aicha");
+  await expect(childRow(page, "Aïcha S.")).toBeVisible();
+  await expect(childRow(page, "Kofi A.")).toHaveCount(0);
+
+  await page.goto("/relais/notifications");
+  await expect(page.getByRole("heading", { level: 1, name: "Notifications" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Message non lu/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Kofi A\..*64 jours/ })).toBeVisible();
+
+  await page.goto("/relais/profil");
+  await expect(page.getByText("Relais à Lomé, quartier Bè")).toBeVisible();
+  await expect(page.getByText("koffi@relais.exemple.tg")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Mes écoles" })).toBeVisible();
+  await expect(page.getByText("EPP Akodessewa")).toBeVisible();
+});
+
+test("une publication depuis le téléphone suit RM-Publier, dictée comprise", async ({ page }) => {
+  test.skip(!isMobile(), "Sous md seulement");
+  await withE2eKeys(page);
+  // Dictée simulée : le navigateur de test n'a pas de micro.
+  await page.addInitScript(() => {
+    class FakeRecognition {
+      onresult: ((event: unknown) => void) | null = null;
+      onend: (() => void) | null = null;
+      start() {
+        const results = [
+          Object.assign([{ transcript: " a reçu son kit scolaire " }], { isFinal: true }),
+        ];
+        setTimeout(() => {
+          this.onresult?.({ resultIndex: 0, results });
+          this.onend?.();
+        }, 0);
+      }
+      stop() {
+        this.onend?.();
+      }
+    }
+    Object.defineProperty(window, "SpeechRecognition", { value: FakeRecognition });
+    Object.defineProperty(window, "webkitSpeechRecognition", { value: FakeRecognition });
+  });
+  await page.goto("/relais/publier");
+  await expect(page.getByRole("heading", { level: 1, name: "Nouvelle publication" })).toBeVisible();
+  // La barre d'envoi remplace la navigation du bas.
+  await expect(page.getByRole("navigation", { name: "Navigation", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Prendre une photo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Filmer" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Choisir dans la galerie" })).toBeVisible();
+
+  // « Plusieurs… » ouvre le choix ; un seul enfant retenu revient à « Un enfant ».
+  await page.getByRole("button", { name: "Plusieurs…" }).click();
+  const picker = page.getByRole("dialog", { name: "Choisir les enfants" });
+  await picker.getByRole("checkbox", { name: /Aïcha S\./ }).check();
+  await picker.getByRole("checkbox", { name: /Mariam T\./ }).check();
+  await picker.getByRole("button", { name: "Valider (2)" }).click();
+  await expect(page.getByRole("button", { name: "Plusieurs (2)" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Publier pour 2 parrains" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Plusieurs (2)" }).click();
+  const again = page.getByRole("dialog", { name: "Choisir les enfants" });
+  await again.getByRole("checkbox", { name: /Mariam T\./ }).uncheck();
+  await again.getByRole("button", { name: "Valider (1)" }).click();
+  await expect(page.getByRole("button", { name: "Publier pour Claire M." })).toBeVisible();
+
+  // Un texte vide est signalé.
+  await page.getByRole("button", { name: "Publier pour Claire M." }).click();
+  await expect(page.getByText("Écrivez le message aux parrains").first()).toBeAttached();
+
+  await page.getByRole("button", { name: "Dicter" }).click();
+  await expect(page.getByLabel("Quelques mots")).toHaveValue("a reçu son kit scolaire");
+  await page.getByRole("button", { name: "Publier pour Claire M." }).click();
+  await expect(page).toHaveURL("/relais");
+  await expect(page.getByRole("status").filter({ hasText: "Nouvelle publiée" })).toBeVisible();
+});
+
+test("sans dictée dans le navigateur, le micro du clavier est proposé", async ({ page }) => {
+  test.skip(!isMobile(), "Sous md seulement");
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "webkitSpeechRecognition", { value: undefined });
+    Object.defineProperty(window, "SpeechRecognition", { value: undefined });
+  });
+  await page.goto("/relais/publier");
+  await page.getByRole("button", { name: "Dicter" }).click();
+  await expect(page.getByText("utilisez le micro de votre clavier")).toBeVisible();
+});
+
+test("une réponse perdue en route ne publie pas deux fois", async ({ page }) => {
+  test.skip(isMobile(), "Le chemin d'envoi est le même sur téléphone");
+  await withE2eKeys(page);
+  const before = await newsThisMonth(page);
+  const title = "Réponse perdue en route";
+  // Le serveur reçoit la publication, mais le navigateur ne voit jamais sa réponse.
+  let posts = 0;
+  await page.route("**/api/relais/news", async (route) => {
+    posts += 1;
+    if (posts === 1) {
+      await route.fetch();
+      await route.abort("connectionreset");
+      return;
+    }
+    await route.continue();
+  });
+  await page.goto(`/relais/publier?enfant=${AICHA}`);
+  await page.getByLabel("Titre").fill(title);
+  await page.getByLabel("Message aux parrains").fill("Une seule publication attendue.");
+  await page.getByRole("button", { name: "Publier", exact: true }).click();
+  await expect(page).toHaveURL("/relais");
+  // La file renvoie la même clé : le serveur répond avec la publication déjà créée.
+  await expect.poll(() => posts, { timeout: 20_000 }).toBeGreaterThanOrEqual(2);
+  await expect(page.getByRole("region", { name: "En attente d'envoi" })).toHaveCount(0);
+  // Deux envois, une seule nouvelle.
+  expect(await newsThisMonth(page)).toBe(before + 1);
 });
 
 test("un enfant d'un autre relais répond par une page introuvable", async ({ page }) => {
@@ -202,7 +357,9 @@ test("une nouvelle pour 6 enfants avec 2 photos atteint les parrains", async ({
   browser,
   claireState,
 }, testInfo) => {
+  test.skip(isMobile(), "Formulaire web, à partir de md");
   await withE2eKeys(page);
+  const before = await newsThisMonth(page);
   await page.goto("/relais/publier");
   await expect(page.getByRole("radio", { name: "Plusieurs enfants" })).toBeChecked();
 
@@ -241,7 +398,7 @@ test("une nouvelle pour 6 enfants avec 2 photos atteint les parrains", async ({
   await expect(page).toHaveURL("/relais");
   await expect(page.getByRole("status").filter({ hasText: "Nouvelle publiée" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Indicateurs" })).toContainText(
-    "Nouvelles ce mois12",
+    `Nouvelles ce mois${before + 1}`,
   );
 
   for (const [email, seen] of [
@@ -265,17 +422,22 @@ test("une nouvelle pour 6 enfants avec 2 photos atteint les parrains", async ({
 
 test("publier pour un enfant sans consentement avertit le relais", async ({ page }) => {
   await page.goto("/relais/publier?enfant=seed-child-koffi-2");
-  await expect(page.getByRole("radio", { name: "Un enfant" })).toBeChecked();
-  await expect(page.getByText("Sans autorisation pour les photos et vidéos")).toBeVisible();
-  await expect(page.getByText(/leurs parrains liront le texte/)).toBeVisible();
+  await expect(
+    visible(page.getByText("Sans autorisation pour les photos et vidéos")),
+  ).toBeVisible();
+  await expect(visible(page.getByText(/leurs parrains liront le texte/))).toBeVisible();
 
   // Un enfant avec consentement : plus d'avertissement.
   await page.goto(`/relais/publier?enfant=${AICHA}`);
   await expect(page.getByText("Sans autorisation pour les photos et vidéos")).toHaveCount(0);
-  await expect(page.getByLabel("Le parrain concerné")).toBeChecked();
+  if (!isMobile()) {
+    await expect(page.getByRole("radio", { name: "Un enfant" })).toBeChecked();
+    await expect(page.getByLabel("Le parrain concerné")).toBeChecked();
+  }
 });
 
 test("une nouvelle se programme, s'affiche à venir et s'annule", async ({ page }) => {
+  test.skip(isMobile(), "Programmer : formulaire web, à partir de md");
   await withE2eKeys(page);
   await page.goto(`/relais/publier?enfant=${AICHA}`);
   await page.getByLabel("Titre").fill("Sortie au musée");
@@ -329,6 +491,9 @@ test("les résultats s'enregistrent seuls, et Claire les voit une fois envoyés"
   await visible(page.getByLabel(/Rang Esther/)).fill("3 / 40");
   await visible(page.getByLabel(/Appréciation Esther/)).fill("Bon début d'année.");
   await expect(childRow(page, "Esther N.")).toContainText("Brouillon");
+  await expect(
+    page.getByRole("status").filter({ hasText: "enregistrement automatique, même hors ligne" }),
+  ).toBeVisible();
   await page.reload();
   await expect(visible(page.getByLabel(/Moyenne Esther/))).toHaveValue("12,5");
   await expect(visible(page.getByLabel(/Rang Esther/))).toHaveValue("3 / 40");

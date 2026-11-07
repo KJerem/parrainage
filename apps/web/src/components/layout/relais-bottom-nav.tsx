@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { CountBadge } from "@/components/ui/chip";
 import { HomeIcon, MessageIcon, UserIcon, UsersIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
@@ -25,6 +26,10 @@ export type RelaisBottomNavProps = {
 /** Barre du bas de l'appli relais (sous md), collée au bas de l'écran. */
 export function RelaisBottomNav({ active, counts = {}, className }: RelaisBottomNavProps) {
   const activeKey = useActiveKey(items, active);
+  // RM-Publier occupe tout l'écran : sa barre d'envoi remplace la navigation.
+  if (usePathname() === "/relais/publier") {
+    return null;
+  }
   return (
     <nav
       aria-label="Navigation"

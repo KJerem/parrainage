@@ -212,6 +212,7 @@ export class ChildrenService {
       bulletinsDue: period
         ? {
             term: period.kind === "ANNUAL" ? "bilan annuel" : period.kind,
+            label: period.label,
             dueDate: period.dueDate?.toISOString().slice(0, 10) ?? null,
           }
         : null,

@@ -19,6 +19,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Button, Chip, CloseIcon, FormField, Input, Select, toast } from "@/components/ui";
 import { ApiRequestError, apiFetch, NETWORK_ERROR_MESSAGE } from "@/lib/api-client";
 import { BULLETIN_COMPRESSION } from "@/lib/upload";
+import { useOutbox } from "./outbox-provider";
 import { resultStatusVariant } from "./relais-labels";
 import { useMediaUpload } from "./use-media-upload";
 
@@ -33,9 +34,8 @@ type Draft = { average: string; rank: string; appreciation: string };
 type RowState = {
   row: ResultRow;
   draft: Draft;
-  /** Saisie plus récente que la dernière sauvegarde. */
+  /** Frappe pas encore mise en file. */
   dirty: boolean;
-  saving: boolean;
   error: string | null;
 };
 
@@ -61,28 +61,25 @@ function parseDraft(
 }
 
 /**
- * RW-Resultats : une ligne par enfant, sauvegardée d'elle-même 800 ms après la dernière frappe, une
- * requête à la fois par ligne. Sous md, des cartes remplacent le tableau, sur le même état.
+ * RW-Resultats : une ligne par enfant, enregistrée d'elle-même 800 ms après la dernière frappe. Tout
+ * passe par la file d'attente, avec ou sans réseau : les saisies arrivent dans l'ordre, et aucune ne
+ * se perd si le réseau manque. Sous md, des cartes remplacent le tableau, sur le même état.
  */
 export function ResultsSheet({ sheet }: { sheet: RelaisResults }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
+  const { items, online, saveResult, flush: flushOutbox, subscribe } = useOutbox();
   const [rows, setRows] = useState<readonly RowState[]>(() =>
-    sheet.rows.map((row) => ({
-      row,
-      draft: draftOf(row),
-      dirty: false,
-      saving: false,
-      error: null,
-    })),
+    sheet.rows.map((row) => ({ row, draft: draftOf(row), dirty: false, error: null })),
   );
   const [sending, setSending] = useState(false);
   const [toggling, setToggling] = useState(false);
   const rowsRef = useRef(rows);
-  rowsRef.current = rows;
+  useEffect(() => {
+    rowsRef.current = rows;
+  }, [rows]);
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
-  const inFlight = useRef(new Map<string, Promise<void>>());
   /** Heure de la dernière frappe par ligne : l'API refuse une donnée plus ancienne. */
   const editedAt = useRef(new Map<string, string>());
 
@@ -90,24 +87,18 @@ export function ResultsSheet({ sheet }: { sheet: RelaisResults }) {
   const schoolId = sheet.schoolId;
 
   const update = useCallback((childId: string, change: (state: RowState) => RowState) => {
-    setRows((current) =>
-      current.map((state) => (state.row.childId === childId ? change(state) : state)),
-    );
+    setRows((current) => {
+      const next = current.map((state) => (state.row.childId === childId ? change(state) : state));
+      rowsRef.current = next;
+      return next;
+    });
   }, []);
 
-  const save = useCallback(
-    async function save(childId: string): Promise<void> {
-      if (!periodId) {
-        return;
-      }
-      const pending = inFlight.current.get(childId);
-      if (pending) {
-        // Une requête à la fois : la plus récente repart à la fin de celle en cours.
-        await pending;
-        return save(childId);
-      }
+  /** Met la ligne en file ; elle affiche tout de suite l'état qu'elle aura une fois enregistrée. */
+  const queueRow = useCallback(
+    async (childId: string): Promise<void> => {
       const state = rowsRef.current.find((value) => value.row.childId === childId);
-      if (!state?.dirty) {
+      if (!state?.dirty || !periodId) {
         return;
       }
       const parsed = parseDraft(state.draft);
@@ -115,44 +106,41 @@ export function ResultsSheet({ sheet }: { sheet: RelaisResults }) {
         update(childId, (value) => ({ ...value, error: parsed }));
         return;
       }
-      const sentDraft = state.draft;
-      update(childId, (value) => ({ ...value, saving: true, error: null }));
-      const request = apiFetch(
-        `/api/relais/results/${encodeURIComponent(periodId)}/${encodeURIComponent(childId)}`,
-        resultRowSchema,
-        {
-          method: "PUT",
-          body: {
-            averageX100: parsed.averageX100,
-            rank: parsed.parsedRank.rank,
-            classSize: parsed.parsedRank.classSize,
-            appreciation: parsed.appreciation,
-            clientUpdatedAt: editedAt.current.get(childId) ?? new Date().toISOString(),
-          },
+      const appreciation = parsed.appreciation.trim() || null;
+      const hasData =
+        parsed.averageX100 !== null || parsed.parsedRank.rank !== null || appreciation !== null;
+      update(childId, (value) => ({
+        ...value,
+        dirty: false,
+        error: null,
+        row: {
+          ...value.row,
+          status: value.row.status === "SENT" ? "SENT" : hasData ? "DRAFT" : "TO_ENTER",
         },
-      )
-        .then(({ data }) => {
-          update(childId, (value) => ({
-            ...value,
-            row: data,
-            saving: false,
-            // Une frappe arrivée pendant la requête reste à envoyer.
-            dirty: value.draft !== sentDraft,
-          }));
-        })
-        .catch((caught: unknown) => {
-          update(childId, (value) => ({ ...value, saving: false, error: errorMessage(caught) }));
-        })
-        .finally(() => {
-          inFlight.current.delete(childId);
-        });
-      inFlight.current.set(childId, request);
-      await request;
-      if (rowsRef.current.find((value) => value.row.childId === childId)?.dirty) {
-        await save(childId);
-      }
+      }));
+      await saveResult(periodId, childId, {
+        averageX100: parsed.averageX100,
+        rank: parsed.parsedRank.rank,
+        classSize: parsed.parsedRank.classSize,
+        appreciation,
+        clientUpdatedAt: editedAt.current.get(childId) ?? new Date().toISOString(),
+      });
     },
-    [periodId, update],
+    [periodId, saveResult, update],
+  );
+
+  // Le résultat de chaque envoi, y compris de ceux partis au retour du réseau.
+  useEffect(
+    () =>
+      subscribe((event) => {
+        if (event.type === "result-saved" && event.periodId === periodId) {
+          update(event.childId, (value) => ({ ...value, row: event.row }));
+        }
+        if (event.type === "result-rejected" && event.periodId === periodId) {
+          update(event.childId, (value) => ({ ...value, error: event.message }));
+        }
+      }),
+    [periodId, subscribe, update],
   );
 
   function change(childId: string, field: keyof Draft, value: string) {
@@ -171,20 +159,20 @@ export function ResultsSheet({ sheet }: { sheet: RelaisResults }) {
       childId,
       setTimeout(() => {
         timers.current.delete(childId);
-        void save(childId);
+        void queueRow(childId);
       }, AUTOSAVE_DELAY_MS),
     );
   }
 
-  /** Enregistre tout de suite ce qui attend encore (avant un envoi, en quittant la page). */
+  /** Met tout de suite en file ce qui attend encore (avant un envoi, en quittant la page). */
   const flush = useCallback(async () => {
     for (const timer of timers.current.values()) {
       clearTimeout(timer);
     }
     timers.current.clear();
-    await Promise.all(rowsRef.current.filter((s) => s.dirty).map((s) => save(s.row.childId)));
-    await Promise.all(inFlight.current.values());
-  }, [save]);
+    await Promise.all(rowsRef.current.filter((s) => s.dirty).map((s) => queueRow(s.row.childId)));
+    await flushOutbox();
+  }, [flushOutbox, queueRow]);
 
   useEffect(
     () => () => {
@@ -276,14 +264,16 @@ export function ResultsSheet({ sheet }: { sheet: RelaisResults }) {
 
   const setRow = (row: ResultRow) => update(row.childId, (state) => ({ ...state, row }));
   const entered = rows.filter((state) => isResultEntered(state.row)).length;
-  const saving = rows.some((state) => state.saving || (state.dirty && !state.error));
+  const waiting =
+    items.some((item) => item.type === "result") ||
+    rows.some((state) => state.dirty && !state.error);
   const hasError = rows.some((state) => state.error !== null);
 
   return (
     <>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="m-0 text-30 font-extrabold max-sm:text-24">Saisir des résultats</h1>
+          <h1 className="m-0 hidden text-30 font-extrabold md:block">Saisir des résultats</h1>
           <p className="m-0 mt-1 text-15 text-muted">
             Saisie groupée : une ligne par enfant. Les parrains sont prévenus à l&apos;envoi.
           </p>
@@ -387,22 +377,29 @@ export function ResultsSheet({ sheet }: { sheet: RelaisResults }) {
             {entered} / {rows.length} saisis ·{" "}
             {hasError
               ? "une ligne n'est pas enregistrée"
-              : saving
-                ? "enregistrement en cours…"
-                : "enregistrement automatique"}
+              : waiting
+                ? online
+                  ? "enregistrement en cours…"
+                  : "hors ligne, saisies gardées sur ce poste"
+                : "enregistrement automatique, même hors ligne"}
           </span>
           <div className="flex flex-wrap gap-2.5 max-sm:w-full max-sm:flex-col max-sm:*:w-full">
             <Button
               variant="secondary"
               loading={toggling}
-              disabled={eligible.length === 0}
+              disabled={eligible.length === 0 || !online}
               onClick={() => void toggleChildUpload()}
             >
               {allAllowed
                 ? "Ne plus laisser l'enfant envoyer son bulletin"
                 : "Laisser l'enfant envoyer son bulletin"}
             </Button>
-            <Button className="font-bold" loading={sending} onClick={() => void sendToParrains()}>
+            <Button
+              className="font-bold"
+              loading={sending}
+              disabled={!online}
+              onClick={() => void sendToParrains()}
+            >
               Envoyer aux parrains
             </Button>
           </div>
@@ -534,6 +531,7 @@ function BulletinCell({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const upload = useMediaUpload("result", BULLETIN_COMPRESSION);
+  const { online } = useOutbox();
   const [error, setError] = useState<string | null>(null);
   const base = periodId
     ? `/api/relais/results/${encodeURIComponent(periodId)}/${encodeURIComponent(row.childId)}/bulletin`
@@ -599,6 +597,7 @@ function BulletinCell({
           size="sm"
           variant="secondary"
           loading={upload.uploading}
+          disabled={!online}
           aria-label={`${pages > 0 ? "Ajouter une page au bulletin" : "Photographier le bulletin"} : ${row.name}`}
           onClick={() => fileRef.current?.click()}
         >

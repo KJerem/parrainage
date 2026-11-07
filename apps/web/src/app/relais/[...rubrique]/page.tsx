@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { ComingSoon } from "@/components/layout/coming-soon";
-import { BellIcon, UserIcon, UsersIcon } from "@/components/ui";
+import { UsersIcon } from "@/components/ui";
 import { requireRole } from "@/lib/auth.server";
 
 /** Rubriques de la navigation du relais qui ne sont pas encore livrées. */
@@ -13,22 +13,6 @@ const rubriques = new Map<string, { title: string; description: string; icon: Re
       title: "Sessions élèves",
       description: "Vous pourrez bientôt ouvrir ici les sessions où les enfants écrivent.",
       icon: <UsersIcon size={26} />,
-    },
-  ],
-  [
-    "profil",
-    {
-      title: "Profil",
-      description: "Vous pourrez bientôt consulter votre profil et vos écoles ici.",
-      icon: <UserIcon size={26} />,
-    },
-  ],
-  [
-    "notifications",
-    {
-      title: "Notifications",
-      description: "Vos alertes s'afficheront bientôt ici.",
-      icon: <BellIcon size={26} />,
     },
   ],
 ]);
@@ -46,5 +30,12 @@ export default async function RelaisRubriquePage({ params }: Props) {
   if (!rubrique) {
     notFound();
   }
-  return <ComingSoon {...rubrique} backHref="/relais" backLabel="Retour à l'accueil" />;
+  return (
+    <ComingSoon
+      {...rubrique}
+      backHref="/relais"
+      backLabel="Retour à l'accueil"
+      titleClassName="max-md:hidden"
+    />
+  );
 }

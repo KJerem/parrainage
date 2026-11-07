@@ -8,6 +8,7 @@ export const e2eRoutes: { path: string; title: string }[] = [
   { path: "/reinitialiser-mot-de-passe", title: "Lien de réinitialisation expiré" },
   { path: "/decouvrir", title: "Découvrir le parrainage" },
   { path: "/interdit", title: "Accès refusé" },
+  { path: "/hors-ligne", title: "Hors ligne" },
   ...devRoutes,
 ];
 
@@ -43,6 +44,8 @@ export const relaisRoutes: { path: string; title: string }[] = [
   { path: "/relais/messages?onglet=bureau", title: "Messages" },
   { path: `/relais/messages/${CLAIRE_KOFFI_CONVERSATION}`, title: "Conversation avec Claire M." },
   { path: "/relais/sessions", title: "Rubrique à venir" },
+  { path: "/relais/profil", title: "Profil" },
+  { path: "/relais/notifications", title: "Notifications" },
   { path: "/relais/enfants", title: "Enfants" },
   { path: "/relais/enfants/nouveau", title: "Ajouter un enfant" },
   { path: "/relais/enfants/seed-child-esther", title: "Fiche d'Esther" },

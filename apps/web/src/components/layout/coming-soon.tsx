@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ArrowLeftIcon, Button, Card, EmptyState } from "@/components/ui";
+import { cn } from "@/lib/cn";
 
 /** Rubrique de la navigation livrée par une phase suivante : page honnête plutôt qu'un 404. */
 export function ComingSoon({
@@ -8,16 +9,23 @@ export function ComingSoon({
   icon,
   backHref,
   backLabel,
+  titleClassName,
 }: {
   title: string;
   description: string;
   icon: ReactNode;
   backHref: string;
   backLabel: string;
+  /** Sous md, le relais a déjà le titre dans son sous-en-tête. */
+  titleClassName?: string;
 }) {
   return (
     <>
-      <h1 className="m-0 text-26 font-extrabold tracking-[-0.01em] sm:text-32">{title}</h1>
+      <h1
+        className={cn("m-0 text-26 font-extrabold tracking-[-0.01em] sm:text-32", titleClassName)}
+      >
+        {title}
+      </h1>
       <Card padding="none">
         <EmptyState
           icon={icon}

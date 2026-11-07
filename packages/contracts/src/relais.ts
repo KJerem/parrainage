@@ -124,8 +124,10 @@ export const relaisHomeSchema = z.object({
     unreadMessages: z.number().int().nonnegative(),
     bulletinsToEnter: z.number().int().nonnegative(),
   }),
-  /** Période en cours de saisie : « T1 », date limite. */
-  bulletinsDue: z.object({ term: z.string(), dueDate: isoDate.nullable() }).nullable(),
+  /** Période en cours de saisie : « T1 », « 1er trimestre », date limite. */
+  bulletinsDue: z
+    .object({ term: z.string(), label: z.string(), dueDate: isoDate.nullable() })
+    .nullable(),
   draftCount: z.number().int().nonnegative(),
   children: z.array(relaisChildRowSchema),
   now: isoDateTime,

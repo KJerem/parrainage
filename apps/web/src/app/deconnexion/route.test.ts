@@ -20,6 +20,11 @@ function clearedCookies(response: Response) {
 }
 
 describe("POST /deconnexion", () => {
+  it("demande au navigateur d'effacer ce qu'il garde, même sans JavaScript", async () => {
+    const response = await logout({ origin: "http://localhost:3000" });
+    expect(response.headers.get("clear-site-data")).toBe('"storage"');
+  });
+
   beforeEach(() => {
     api.mockReset();
     api.mockResolvedValue(new Response('{"success":true}', { status: 200 }));

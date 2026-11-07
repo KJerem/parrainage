@@ -39,7 +39,12 @@ export async function POST(request: NextRequest) {
   }
 
   // Location relative : valable derrière un tunnel ou un proxy inverse.
-  const response = new NextResponse(null, { status: 303, headers: { Location: LOGIN_PATH } });
+  // « storage » : caches, IndexedDB et service worker (https ou localhost) ; rien n'est gardé sur
+  // le poste, même si le JavaScript de la page n'a pas pu faire la purge.
+  const response = new NextResponse(null, {
+    status: 303,
+    headers: { Location: LOGIN_PATH, "Clear-Site-Data": '"storage"' },
+  });
   for (const name of new Set([...SESSION_COOKIES, ...authCookies])) {
     response.cookies.set(name, "", {
       path: "/",
