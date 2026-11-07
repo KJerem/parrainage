@@ -9,6 +9,7 @@ export const e2eRoutes: { path: string; title: string }[] = [
   { path: "/decouvrir", title: "Découvrir le parrainage" },
   { path: "/interdit", title: "Accès refusé" },
   { path: "/hors-ligne", title: "Hors ligne" },
+  { path: "/eleve", title: "Aucune session sur ce poste" },
   ...devRoutes,
 ];
 
@@ -43,7 +44,8 @@ export const relaisRoutes: { path: string; title: string }[] = [
   { path: "/relais/messages", title: "Messages" },
   { path: "/relais/messages?onglet=bureau", title: "Messages" },
   { path: `/relais/messages/${CLAIRE_KOFFI_CONVERSATION}`, title: "Conversation avec Claire M." },
-  { path: "/relais/sessions", title: "Rubrique à venir" },
+  { path: "/relais/sessions", title: "Sessions élèves" },
+  { path: `/relais/messages/${AICHA_CONVERSATION}`, title: "Conversation d'un enfant" },
   { path: "/relais/profil", title: "Profil" },
   { path: "/relais/notifications", title: "Notifications" },
   { path: "/relais/enfants", title: "Enfants" },

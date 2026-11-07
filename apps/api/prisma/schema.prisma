@@ -50,6 +50,7 @@ model User {
   reviewedMessages Message[]                 @relation("MessageReviewer")
   enteredResults   SchoolResult[]            @relation("SchoolResultEnteredBy")
   recordedConsents ConsentRecord[]           @relation("ConsentRecordedBy")
+  classSessions    ClassSession[]            @relation("ClassSessionCreatedBy")
 
   @@unique([email])
   @@map("user")
@@ -153,6 +154,7 @@ model Relais {
   children      Child[]
   newsPosts     NewsPost[]
   conversations Conversation[]
+  classSessions ClassSession[]
 }
 
 model School {
@@ -235,6 +237,9 @@ model Child {
   /// Code image haché (Argon2id, poivre CHILD_CODE_PEPPER) : montré une seule fois au relais.
   codeHash           String?
   codeSetAt          DateTime?
+  /// Échecs de connexion depuis le dernier succès ; le verrou se pose au 3e, le relais le lève.
+  failedCodeAttempts Int             @default(0)
+  codeLockedAt       DateTime?
   submittedAt        DateTime?
   validatedAt        DateTime?
   createdAt          DateTime        @default(now())
@@ -248,6 +253,8 @@ model Child {
   results       SchoolResult[]
   payments      Payment[]
   consents      ConsentRecord[]
+  classSessions ClassSessionChild[]
+  uploadedMedia Media[]                   @relation("MediaUploadedByChild")
 
   @@index([relaisId, fileStatus])
   @@index([schoolId])
@@ -328,30 +335,33 @@ enum MediaStatus {
 
 /// Fichier du stockage S3, servi uniquement par GET /api/media/:id (URL présignée de 120 s).
 model Media {
-  id               String        @id @default(cuid())
-  kind             MediaKind
-  status           MediaStatus   @default(PENDING_UPLOAD)
-  storageKey       String?       @unique
+  id                String        @id @default(cuid())
+  kind              MediaKind
+  status            MediaStatus   @default(PENDING_UPLOAD)
+  storageKey        String?       @unique
   /// Envoi multipart S3 en cours (fichier de plus de 5 Mo) ; effacé une fois le fichier assemblé.
-  uploadId         String?
-  posterKey        String?
-  mimeType         String
-  sizeBytes        Int?
-  width            Int?
-  height           Int?
-  durationSec      Int?
-  label            String?
-  uploadedByUserId String?
-  uploadedBy       User?         @relation("MediaUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
-  messageId        String?
-  message          Message?      @relation(fields: [messageId], references: [id], onDelete: SetNull)
-  newsPostId       String?
-  newsPost         NewsPost?     @relation(fields: [newsPostId], references: [id], onDelete: SetNull)
-  schoolResultId   String?
-  schoolResult     SchoolResult? @relation(fields: [schoolResultId], references: [id], onDelete: SetNull)
+  uploadId          String?
+  posterKey         String?
+  mimeType          String
+  sizeBytes         Int?
+  width             Int?
+  height            Int?
+  durationSec       Int?
+  label             String?
+  uploadedByUserId  String?
+  uploadedBy        User?         @relation("MediaUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  /// Fichier envoyé par un enfant, pendant une session élève.
+  uploadedByChildId String?
+  uploadedByChild   Child?        @relation("MediaUploadedByChild", fields: [uploadedByChildId], references: [id], onDelete: SetNull)
+  messageId         String?
+  message           Message?      @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  newsPostId        String?
+  newsPost          NewsPost?     @relation(fields: [newsPostId], references: [id], onDelete: SetNull)
+  schoolResultId    String?
+  schoolResult      SchoolResult? @relation(fields: [schoolResultId], references: [id], onDelete: SetNull)
   /// Ordre d'affichage parmi les médias d'un même contenu.
-  position         Int           @default(0)
-  createdAt        DateTime      @default(now())
+  position          Int           @default(0)
+  createdAt         DateTime      @default(now())
 
   avatarOf  Child? @relation("ChildPhoto")
   consentOf Child? @relation("ChildConsentDocument")
@@ -360,6 +370,7 @@ model Media {
   @@index([newsPostId])
   @@index([schoolResultId])
   @@index([uploadedByUserId])
+  @@index([uploadedByChildId])
   @@index([status, createdAt])
 }
 
@@ -617,6 +628,58 @@ model Message {
 }
 
 // ─── Finances (simulées) ──────────────────────────────────────────────────────
+
+enum ClassSessionStatus {
+  PLANNED
+  OPEN
+  CLOSED
+}
+
+/// Session élève : un temps d'écriture ouvert par le relais, sur un seul poste. Les droits sont
+/// figés à l'ouverture et seuls les enfants de la liste peuvent s'y connecter.
+model ClassSession {
+  id                    String             @id @default(cuid())
+  relaisId              String
+  relais                Relais             @relation(fields: [relaisId], references: [id], onDelete: Restrict)
+  status                ClassSessionStatus @default(PLANNED)
+  scheduledAt           DateTime?
+  durationMinutes       Int
+  allowWriteSponsor     Boolean            @default(true)
+  allowMedia            Boolean            @default(true)
+  allowBulletin         Boolean            @default(true)
+  allowWriteAssociation Boolean            @default(false)
+  openedAt              DateTime?
+  endsAt                DateTime?
+  closedAt              DateTime?
+  /// Empreinte sha256 du jeton du poste : le jeton lui-même n'existe que dans le cookie.
+  deviceTokenHash       String?
+  /// Codes faux sur toute la session ; au-delà du plafond, la session est suspendue.
+  failedAttempts        Int                @default(0)
+  suspendedAt           DateTime?
+  /// Messages envoyés par les enfants pendant la session (« 7 envois »).
+  sendCount             Int                @default(0)
+  createdById           String
+  createdBy             User               @relation("ClassSessionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  children ClassSessionChild[]
+
+  @@index([relaisId, status])
+  @@index([status, endsAt])
+  @@index([createdById])
+}
+
+model ClassSessionChild {
+  sessionId   String
+  session     ClassSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  childId     String
+  child       Child        @relation(fields: [childId], references: [id], onDelete: Cascade)
+  lastLoginAt DateTime?
+
+  @@id([sessionId, childId])
+  @@index([childId])
+}
 
 enum PaymentKind {
   MONTHLY

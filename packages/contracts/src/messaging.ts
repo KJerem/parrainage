@@ -215,7 +215,7 @@ export const messagePageQuerySchema = z.object({
 
 export type MessagePageQuery = z.infer<typeof messagePageQuerySchema>;
 
-const idempotencyKeySchema = z
+export const idempotencyKeySchema = z
   .string()
   .trim()
   .min(8)

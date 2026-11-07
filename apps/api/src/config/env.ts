@@ -36,6 +36,16 @@ export const envSchema = z
       .string()
       .min(32, "CHILD_CODE_PEPPER doit compter au moins 32 caractères")
       .default(`${EXAMPLE_SECRET_PREFIX}-poivre-du-code-image-des-enfants`),
+    /** Signature des cookies de session élève (jose) ; le secret d'exemple est refusé en production. */
+    CHILD_SESSION_SECRET: z
+      .string()
+      .min(32, "CHILD_SESSION_SECRET doit compter au moins 32 caractères")
+      .default(`${EXAMPLE_SECRET_PREFIX}-secret-des-sessions-eleves-a-changer`),
+    /** Échecs du code image avant le verrou de l'enfant, puis avant la suspension de la session. */
+    CHILD_CODE_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
+    CHILD_SESSION_MAX_FAILURES: z.coerce.number().int().positive().default(15),
+    /** Durée maximale d'une vidéo envoyée par un enfant. */
+    CHILD_VIDEO_MAX_SECONDS: z.coerce.number().int().positive().default(60),
     /** Tâches planifiées (publication programmée, purge des fichiers) : « false » pour les couper. */
     SCHEDULER_ENABLED: z.stringbool().default(true),
     /** Horloge figée (démo, e2e) : « 2026-10-31T10:00:00Z ». Vide : heure réelle. */
@@ -58,6 +68,14 @@ export const envSchema = z
     {
       path: ["CHILD_CODE_PEPPER"],
       message: "CHILD_CODE_PEPPER : le secret d'exemple est interdit en production",
+    },
+  )
+  .refine(
+    (env) =>
+      env.NODE_ENV !== "production" || !env.CHILD_SESSION_SECRET.startsWith(EXAMPLE_SECRET_PREFIX),
+    {
+      path: ["CHILD_SESSION_SECRET"],
+      message: "CHILD_SESSION_SECRET : le secret d'exemple est interdit en production",
     },
   );
 

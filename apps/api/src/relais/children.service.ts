@@ -179,7 +179,8 @@ export class ChildrenService {
   async home(actor: RelaisActor, fullActor: Actor): Promise<RelaisHome> {
     const at = now();
     const monthStart = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), 1));
-    const [children, newsThisMonth, unread, periods] = await Promise.all([
+    const startOfToday = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()));
+    const [children, newsThisMonth, unread, periods, nextSession] = await Promise.all([
       this.rows(actor, at),
       this.prisma.newsPost.count({
         where: {
@@ -190,6 +191,15 @@ export class ChildrenService {
       }),
       this.messaging.unreadTotal(fullActor),
       schoolYearPeriods(this.prisma, at),
+      this.prisma.classSession.findFirst({
+        where: {
+          relaisId: actor.relaisId,
+          status: "PLANNED",
+          scheduledAt: { gte: startOfToday },
+        },
+        orderBy: { scheduledAt: "asc" },
+        select: { id: true, scheduledAt: true, _count: { select: { children: true } } },
+      }),
     ]);
     const followed = children.filter((child) => FOLLOWED_STATUSES.includes(child.fileStatus));
     const period = currentPeriod(periods, at);
@@ -217,6 +227,13 @@ export class ChildrenService {
           }
         : null,
       draftCount: children.filter((child) => child.fileStatus === "DRAFT").length,
+      nextSession: nextSession?.scheduledAt
+        ? {
+            id: nextSession.id,
+            scheduledAt: nextSession.scheduledAt.toISOString(),
+            childCount: nextSession._count.children,
+          }
+        : null,
       children,
       now: at.toISOString(),
     };
@@ -352,7 +369,11 @@ export class ChildrenService {
     const images = randomChildCode();
     const codeHash = await hashChildCode(images, this.pepper);
     await this.prisma.$transaction(async (tx) => {
-      await tx.child.update({ where: { id }, data: { codeHash, codeSetAt: at } });
+      // Un nouveau code lève aussi le verrou : l'enfant repart avec tous ses essais.
+      await tx.child.update({
+        where: { id },
+        data: { codeHash, codeSetAt: at, failedCodeAttempts: 0, codeLockedAt: null },
+      });
       await this.audit(tx, actor, id, "child.code_reset", at);
     });
     return { images };

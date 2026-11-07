@@ -8,7 +8,7 @@ import {
   type RelaisHome,
   type ResultStatus,
 } from "@parrainage/contracts";
-import { formatAge } from "@/lib/format";
+import { formatAge, formatWeekday, RELAIS_TIME_ZONE } from "@/lib/format";
 
 /** Variante de Chip selon la fraîcheur de la dernière nouvelle. */
 export const freshnessVariant: Readonly<Record<NewsFreshness, "success" | "warning" | "danger">> = {
@@ -105,7 +105,7 @@ export function childSummaryLabel(
 
 export type RelaisTodo = {
   key: string;
-  kind: "stale" | "bulletins" | "drafts" | "messages";
+  kind: "stale" | "bulletins" | "drafts" | "messages" | "session";
   title: string;
   detail: string;
   href: string;
@@ -116,7 +116,7 @@ export type RelaisTodo = {
 
 /**
  * Ce qui demande l'attention du relais, calculé : enfants sans nouvelle depuis 60 jours (le plus
- * ancien d'abord), bulletins à saisir, dossiers à finir, messages non lus.
+ * ancien d'abord), bulletins à saisir, prochaine session, dossiers à finir, messages non lus.
  */
 export function relaisTodos(home: RelaisHome): RelaisTodo[] {
   const stale = home.children
@@ -162,6 +162,19 @@ export function relaisTodos(home: RelaisHome): RelaisTodo[] {
           },
         ]
       : [];
+  const session: RelaisTodo[] = home.nextSession
+    ? [
+        {
+          key: "session",
+          kind: "session",
+          title: `Session d'écriture ${formatWeekday(home.nextSession.scheduledAt, RELAIS_TIME_ZONE)}`,
+          detail: `${home.nextSession.childCount} ${home.nextSession.childCount > 1 ? "enfants inscrits" : "enfant inscrit"}`,
+          href: `/relais/sessions?planifiee=${encodeURIComponent(home.nextSession.id)}`,
+          badge: String(home.nextSession.childCount),
+          tone: "info",
+        },
+      ]
+    : [];
   const messages: RelaisTodo[] =
     unreadMessages > 0
       ? [
@@ -176,7 +189,7 @@ export function relaisTodos(home: RelaisHome): RelaisTodo[] {
           },
         ]
       : [];
-  return [...messages, ...stale, ...bulletins, ...drafts];
+  return [...messages, ...stale, ...bulletins, ...session, ...drafts];
 }
 
 const QUICK_CHILDREN = 3;

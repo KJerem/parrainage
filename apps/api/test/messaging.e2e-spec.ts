@@ -191,7 +191,9 @@ describe("Messagerie (e2e)", () => {
       const children = conversationListSchema.parse(
         (await get("koffi", "/api/conversations?kind=SPONSORSHIP").expect(200)).body,
       ).items;
-      expect(children.length).toBeGreaterThan(5);
+      // Seules les conversations où un message a été échangé : Aïcha, Kofi (deux parrains)…
+      expect(children.length).toBeGreaterThanOrEqual(5);
+      expect(children.every((c) => c.lastMessage !== null)).toBe(true);
       expect(children.every((c) => c.access === "supervisor" && c.unreadCount === 0)).toBe(true);
       expect(children.find((c) => c.id === AICHA_CLAIRE)!.counterpart.subtitle).toBe(
         "Avec sa marraine Claire M.",

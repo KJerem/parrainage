@@ -35,6 +35,7 @@ import { listedMedia, listedMediaWhere, toMediaRef } from "../media/media-ref.js
 import { BUREAU_NAME, childName } from "../messaging/present.js";
 import { MODERATED_KINDS, unreadWhere } from "../messaging/visibility.js";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { currentPeriod, schoolYearPeriods } from "../relais/relais-common.js";
 import { lastNewsAtOf, lastNewsSelect } from "../relais/relais-common.js";
 import { StorageService } from "../storage/storage.service.js";
 
@@ -118,7 +119,7 @@ const decisionSelect = {
   authorUserId: true,
   authorChildId: true,
   conversationId: true,
-  media: { ...listedMedia, select: { id: true, storageKey: true } },
+  media: { ...listedMedia, select: { id: true, kind: true, storageKey: true } },
   conversation: {
     select: {
       kind: true,
@@ -309,6 +310,7 @@ export class ModerationService {
     const status = decidedStatus[input.decision];
     const reason = input.decision === "APPROVE" ? null : input.reason;
     const at = now();
+    const period = currentPeriod(await schoolYearPeriods(this.prisma, at), at);
 
     await this.prisma.$transaction(async (tx) => {
       // Le verrou de ligne fait attendre une décision concurrente, qui ne trouve alors plus rien.
@@ -339,6 +341,9 @@ export class ModerationService {
           data: { status: "REJECTED", messageId: null },
         });
       }
+      if (status !== "HELD" && message.authorChildId && period) {
+        await this.fileChildBulletin(tx, message, removed, message.authorChildId, period.id);
+      }
       await tx.auditLog.create({
         data: {
           actorUserId: reviewerId,
@@ -357,6 +362,60 @@ export class ModerationService {
     await removeStoredFiles(this.prisma, this.storage, this.logger, removed);
     await this.notify(message, status, reason);
     return { id, moderationStatus: status, nextId: await this.nextPendingId() };
+  }
+
+  /**
+   * « Laisser l'enfant envoyer son bulletin » : une fois relues, ses pages remplissent sa ligne
+   * dans la saisie des résultats, si elle n'a pas encore de bulletin.
+   */
+  private async fileChildBulletin(
+    tx: Prisma.TransactionClient,
+    message: DecisionRow,
+    removed: readonly { id: string }[],
+    childId: string,
+    periodId: string,
+  ): Promise<void> {
+    const pages = message.media.filter(
+      (media) => media.kind === "BULLETIN" && !removed.some((r) => r.id === media.id),
+    );
+    if (pages.length === 0) {
+      return;
+    }
+    const result = await tx.schoolResult.findFirst({
+      where: {
+        childId,
+        periodId,
+        allowChildUpload: true,
+        media: { none: { kind: "BULLETIN" } },
+      },
+      select: { id: true },
+    });
+    if (result) {
+      await tx.media.updateMany({
+        where: { id: { in: pages.map((page) => page.id) }, messageId: message.id },
+        data: { schoolResultId: result.id },
+      });
+    }
+  }
+
+  /** Signalement par le relais : les messages de ses enfants, encore en relecture. */
+  async flagAsRelais(
+    actor: { userId: string; relaisId: string },
+    id: string,
+    input: ModerationFlag,
+  ): Promise<ModerationFlagResult> {
+    const message = await this.prisma.message.findFirst({
+      where: {
+        id,
+        authorChildId: { not: null },
+        conversation: { child: { relaisId: actor.relaisId } },
+      },
+      select: { id: true },
+    });
+    if (!message) {
+      throw new AppError(404, NOT_FOUND_MESSAGE);
+    }
+    return this.flag(actor.userId, id, input);
   }
 
   async flag(reviewerId: string, id: string, input: ModerationFlag): Promise<ModerationFlagResult> {
@@ -482,8 +541,11 @@ export class ModerationService {
     if (authorIsChild) {
       const relaisUserId = conversation.child?.relais.userId;
       if (relaisUserId) {
-        // Page Messages, sans la conversation : son onglet « Enfants » arrive avec les sessions.
-        await this.mail(relaisUserId, messagesPath("relais"), content("relais"));
+        await this.mail(
+          relaisUserId,
+          messagesPath("relais", message.conversationId),
+          content("relais"),
+        );
       }
     } else if (message.authorUserId) {
       await this.mail(message.authorUserId, parrainPath, content("parrain"));

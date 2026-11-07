@@ -298,6 +298,20 @@ test("les saisies de résultats hors ligne partent dans l'ordre, la dernière de
   await expect(field(/Moyenne Kofi/)).toHaveValue("10");
 });
 
+test("l'espace élève retire le service worker et les pages gardées du relais", async ({ page }) => {
+  await page.goto("/relais");
+  await offlineReady(page);
+  await page.goto("/eleve");
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        return { workers: registrations.length, pages: await caches.has("relais-pages") };
+      }),
+    )
+    .toEqual({ workers: 0, pages: false });
+});
+
 test("après déconnexion, rien ne reste sur le poste, même hors ligne", async ({
   browser,
 }, testInfo) => {

@@ -132,6 +132,7 @@ describe("relaisTodos", () => {
     bulletinsDue: null,
     draftCount: 0,
     children: [],
+    nextSession: null,
     now,
     ...overrides,
   });
@@ -181,6 +182,22 @@ describe("relaisTodos", () => {
       ["bulletins", "Bulletins du 1er trimestre", "7 enfants sur 18 restent à saisir"],
       ["drafts", "Dossier à terminer", "Pas encore envoyé au bureau"],
     ]);
+  });
+
+  it("annonce la prochaine session élève", () => {
+    const [todo] = relaisTodos(
+      home({ nextSession: { id: "s 1", scheduledAt: "2026-11-03T15:15:00Z", childCount: 6 } }),
+    );
+    expect(todo).toMatchObject({
+      kind: "session",
+      title: "Session d'écriture mardi",
+      detail: "6 enfants inscrits",
+      href: "/relais/sessions?planifiee=s%201",
+    });
+    const [one] = relaisTodos(
+      home({ nextSession: { id: "s", scheduledAt: "2026-11-03T15:15:00Z", childCount: 1 } }),
+    );
+    expect(one?.detail).toBe("1 enfant inscrit");
   });
 
   it("accorde au singulier", () => {

@@ -4,6 +4,16 @@ export const LOGIN_PATH = "/connexion";
 export const FORBIDDEN_PATH = "/interdit";
 
 /** Espaces des comptes adultes : sans cookie de session, le proxy renvoie vers la connexion. */
+/** Écran de connexion des enfants, et cookie posé par l'API à leur connexion (httpOnly). */
+export const ELEVE_HOME = "/eleve";
+export const CHILD_COOKIE = "kd_child";
+export const DEVICE_COOKIE = "kd_device";
+
+/** Pages d'un enfant connecté : tout l'espace, sauf l'écran de connexion. */
+export function isChildPath(pathname: string): boolean {
+  return pathname.startsWith(`${ELEVE_HOME}/`);
+}
+
 export const protectedSpaces = ["/parrain", "/relais", "/bureau"] as const;
 
 export function isProtectedPath(pathname: string): boolean {

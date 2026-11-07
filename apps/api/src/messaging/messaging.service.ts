@@ -456,8 +456,13 @@ export class MessagingService {
         ...(kinds ? { kind: { in: [...kinds] } } : {}),
         // Une conversation d'adultes ouverte puis abandonnée n'apparaît chez personne. Celle d'un
         // binôme reste listée : c'est par elle qu'un nouveau parrain écrit à son filleul.
+        // Le relais, lui, ne suit que les conversations de ses enfants où il s'est passé quelque chose.
         ...(hideEmpty
-          ? { AND: [{ OR: [{ kind: { in: [...MODERATED_KINDS] } }, { messages: { some: {} } }] }] }
+          ? actor.role === "relais"
+            ? { messages: { some: {} } }
+            : {
+                AND: [{ OR: [{ kind: { in: [...MODERATED_KINDS] } }, { messages: { some: {} } }] }],
+              }
           : {}),
       },
       orderBy: [{ lastMessageAt: "desc" }, { id: "desc" }],

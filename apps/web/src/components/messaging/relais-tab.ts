@@ -1,7 +1,7 @@
 import type { ConversationKind } from "@parrainage/contracts";
 import { features } from "@/lib/features";
 
-/** Onglets de RW-Messages (`?onglet=`) ; « Enfants » attend la phase 8. */
+/** Onglets de RW-Messages (`?onglet=`). */
 export const relaisTabs = ["parrains", "bureau", "enfants"] as const;
 
 export type RelaisTab = (typeof relaisTabs)[number];

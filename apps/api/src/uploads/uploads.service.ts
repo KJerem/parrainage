@@ -35,11 +35,18 @@ import {
   tooLongMessage,
   type UploadLimits,
   uploadLimitsFrom,
+  validateChildUploadRequest,
   validateUploadRequest,
 } from "./upload-rules.js";
 
 /** Envois en cours (non terminés) autorisés par utilisateur. */
 const MAX_PENDING_UPLOADS = 20;
+
+/** Qui envoie : un adulte connecté, ou un enfant pendant une session élève. */
+export type UploadOwner = { userId: string } | { childId: string };
+
+const ownerWhere = (owner: UploadOwner) =>
+  "childId" in owner ? { uploadedByChildId: owner.childId } : { uploadedByUserId: owner.userId };
 
 const uploadSelect = {
   id: true,
@@ -54,6 +61,7 @@ const uploadSelect = {
   durationSec: true,
   label: true,
   uploadedByUserId: true,
+  uploadedByChildId: true,
 } as const satisfies Prisma.MediaSelect;
 
 type UploadRow = Prisma.MediaGetPayload<{ select: typeof uploadSelect }>;
@@ -93,6 +101,7 @@ export function checkParts(
 export class UploadsService {
   private readonly logger = new Logger(UploadsService.name);
   private readonly limits: UploadLimits;
+  private readonly childVideoMaxSeconds: number;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -105,12 +114,23 @@ export class UploadsService {
       UPLOAD_MAX_DOC_MB: config.get("UPLOAD_MAX_DOC_MB", { infer: true }),
       VIDEO_MAX_SECONDS: config.get("VIDEO_MAX_SECONDS", { infer: true }),
     });
+    this.childVideoMaxSeconds = config.get("CHILD_VIDEO_MAX_SECONDS", { infer: true });
   }
 
   async create(actor: Actor, input: CreateUpload): Promise<UploadTicket> {
     validateUploadRequest(input, actor.role, this.limits);
+    return this.createFor({ userId: actor.userId }, input);
+  }
+
+  /** Les droits de la session élève sont vérifiés par l'appelant. */
+  async createForChild(childId: string, input: CreateUpload): Promise<UploadTicket> {
+    validateChildUploadRequest(input, this.limits);
+    return this.createFor({ childId }, input);
+  }
+
+  private async createFor(owner: UploadOwner, input: CreateUpload): Promise<UploadTicket> {
     const pending = await this.prisma.media.count({
-      where: { uploadedByUserId: actor.userId, status: "PENDING_UPLOAD" },
+      where: { ...ownerWhere(owner), status: "PENDING_UPLOAD" },
     });
     if (pending >= MAX_PENDING_UPLOADS) {
       throw new AppError(429, "Trop d'envois en cours. Terminez-les ou réessayez plus tard.");
@@ -131,7 +151,7 @@ export class UploadsService {
         mimeType: input.mimeType,
         sizeBytes: input.sizeBytes,
         label: DEFAULT_LABELS[input.kind],
-        uploadedByUserId: actor.userId,
+        ...ownerWhere(owner),
         createdAt: now(),
       },
     });
@@ -160,8 +180,8 @@ export class UploadsService {
   }
 
   /** Reprise : parts déjà reçues, et de nouvelles URL pour les parts manquantes. */
-  async parts(actor: Actor, mediaId: string): Promise<UploadParts> {
-    const row = await this.ownUpload(actor, mediaId);
+  async parts(owner: UploadOwner, mediaId: string): Promise<UploadParts> {
+    const row = await this.ownUpload(owner, mediaId);
     if (row.status !== "PENDING_UPLOAD" || !row.storageKey || row.sizeBytes === null) {
       throw new AppError(409, "Cet envoi n'est plus en cours");
     }
@@ -187,8 +207,8 @@ export class UploadsService {
    * Fin de l'envoi : assemblage des parts, taille, magic bytes, nettoyage des métadonnées, puis
    * READY. Un fichier refusé est supprimé du stockage et le média passe en REJECTED.
    */
-  async complete(actor: Actor, mediaId: string): Promise<UploadedMedia> {
-    const row = await this.ownUpload(actor, mediaId);
+  async complete(owner: UploadOwner, mediaId: string): Promise<UploadedMedia> {
+    const row = await this.ownUpload(owner, mediaId);
     if (row.status === "READY") {
       return this.toUploaded(row);
     }
@@ -251,8 +271,10 @@ export class UploadsService {
       }
       throw error;
     }
-    if (kind === "VIDEO" && (clean.durationSec ?? 0) > this.limits.videoMaxSeconds) {
-      return this.reject(row, 422, tooLongMessage(this.limits.videoMaxSeconds));
+    const videoMaxSeconds =
+      "childId" in owner ? this.childVideoMaxSeconds : this.limits.videoMaxSeconds;
+    if (kind === "VIDEO" && (clean.durationSec ?? 0) > videoMaxSeconds) {
+      return this.reject(row, 422, tooLongMessage(videoMaxSeconds));
     }
     if (clean.body.length > maxBytes) {
       return this.reject(row, 413, tooLargeMessage(kind, maxBytes));
@@ -279,13 +301,17 @@ export class UploadsService {
     return this.toUploaded(ready);
   }
 
-  private async ownUpload(actor: Actor, mediaId: string): Promise<UploadRow> {
+  private async ownUpload(owner: UploadOwner, mediaId: string): Promise<UploadRow> {
     const row = await this.prisma.media.findUnique({
       where: { id: mediaId },
       select: uploadSelect,
     });
     // Média inconnu ou envoyé par un autre : même réponse.
-    if (!row || row.uploadedByUserId !== actor.userId) {
+    const isOwner =
+      "childId" in owner
+        ? row?.uploadedByChildId === owner.childId
+        : row?.uploadedByUserId === owner.userId;
+    if (!row || !isOwner) {
       throw new NotFoundException();
     }
     return row;

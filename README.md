@@ -117,6 +117,20 @@ L'espace relais s'installe comme une application (`public/relais.webmanifest`, a
 - **Saisie sur téléphone** : prise de vue directe (`capture`), photos allégées dans le navigateur, dictée par la Web Speech API en français ; sans elle, le micro du clavier est proposé.
 - **Test sur un vrai téléphone** : caméra, service worker et dictée exigent le HTTPS hors de `localhost`, donc un tunnel (`ngrok http 3000` par exemple), avec `NEXT_PUBLIC_APP_URL` et `APP_URL` réglés sur son adresse.
 
+## Sessions élèves
+
+Un enfant n'a pas de compte : il se connecte pendant une session que son relais ouvre, sur un poste précis (`/relais/sessions`, puis `/eleve`).
+
+- **Ouverture** : le relais choisit les enfants, la durée (30, 45 min ou 1 h) et ce qu'ils peuvent faire. Les droits sont figés. L'ouverture est refusée si des envois attendent sur le poste. Le relais y est déconnecté, côté serveur et dans le navigateur, et l'espace relais hors ligne est effacé. Sur téléphone, il le confirme d'abord. Une session se planifie aussi à l'avance : ses enfants sont déjà cochés le jour venu.
+- **Deux cookies** (`kd_device`, `kd_child`, jose, httpOnly, `SameSite=Strict`, signés par `CHILD_SESSION_SECRET`) : l'un ne vaut rien sans l'autre, et ils ne servent que pendant la session. L'API les vérifie à chaque requête, en base : une session fermée, expirée ou suspendue refuse l'enfant dès sa requête suivante. La base ne garde que l'empreinte du jeton du poste.
+- **Code image** : 3 images parmi 6, dans l'ordre. L'ordre d'affichage change à chaque essai. Le compteur est en base et chaque essai réserve sa place par un seul `UPDATE` avant Argon2 : des requêtes parallèles ne testent pas plus de codes que le plafond. Verrou au 3e échec (`CHILD_CODE_MAX_ATTEMPTS`), levé par le relais ou par un nouveau code. La session est suspendue au 15e échec (`CHILD_SESSION_MAX_FAILURES`), jusqu'à sa reprise par le relais.
+- **Ce que voit l'enfant** : le prénom de son parrain et leur fil, jamais son nom ni son adresse. Ses messages et fichiers passent en relecture, et la conversation ne remonte chez le parrain qu'une fois approuvés. Sans consentement médias : ni photo ni vidéo. La caméra ne s'allume qu'après un appui, une vidéo dure 60 s au plus (`CHILD_VIDEO_MAX_SECONDS`).
+- **Bulletin** : ses pages partent comme un message relu. Si le relais a coché « Laisser l'enfant envoyer son bulletin », elles remplissent aussi sa ligne dans les résultats une fois approuvées.
+- **Fin** : « J'ai fini » ne retire que l'enfant, le poste reste ouvert pour le suivant. Une session fermée par le relais renvoie l'enfant à la connexion en moins de 30 s, même sans action de sa part. Aucune page d'enfant n'est gardée en cache.
+- **Relais** : il suit la session en cours (qui est là, qui est bloqué), peut débloquer, reprendre ou fermer, et suit les conversations de ses enfants dans l'onglet « Enfants » de ses messages. Il ne lit pas un message en relecture, mais peut le signaler au bureau.
+
+Dans la démonstration, tous les enfants de M. Koffi ont un code image. Celui d'Aïcha est celui du design : Soleil, Arbre, Poisson. Pour essayer : connectez-vous avec `koffi@relais.exemple.tg`, ouvrez la session sur `/relais/sessions`, puis choisissez Aïcha.
+
 ## Modération
 
 Le bureau relit chaque message échangé avec un enfant, sur `/bureau` (file et approbation sur place) et `/bureau/moderation` (file et message relu).
@@ -127,7 +141,7 @@ Le bureau relit chaque message échangé avec un enfant, sur `/bureau` (file et 
   - **Masquer** : motif obligatoire, texte proposé puis corrigeable, pièces jointes retirables. Le destinataire ne reçoit que cette version, et un fichier retiré est effacé du stockage.
   - **Retenir** : motif obligatoire, le message n'est pas remis.
 - **E-mails** : un lien, jamais une ligne du message. Le parrain d'un enfant est prévenu d'un message remis, sauf s'il a déjà des non-lus dans cette conversation. Message retenu ou masqué : l'auteur adulte reçoit le motif et la règle de la charte ; pour un message d'enfant, c'est son relais qui est prévenu. Un enfant ne reçoit jamais d'e-mail.
-- **Signalements** : le bureau pose ou retire un signalement manuel (`POST /api/moderation/messages/:id/flag`). Le signalement par le relais arrive avec les sessions élèves.
+- **Signalements** : le bureau pose ou retire un signalement manuel (`POST /api/moderation/messages/:id/flag`). Le relais signale un message de ses enfants depuis leur conversation (`POST /api/relais/messages/:id/flag`).
 
 ## Tests de bout en bout du web
 

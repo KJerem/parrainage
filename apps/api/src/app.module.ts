@@ -4,6 +4,7 @@ import { AuthModule } from "@thallesp/nestjs-better-auth";
 import { AdminModule } from "./admin/admin.module.js";
 import { auth } from "./auth/auth.js";
 import { validateEnv } from "./config/env.js";
+import { EleveModule } from "./eleve/eleve.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { MailModule } from "./mail/mail.module.js";
 import { MediaModule } from "./media/media.module.js";
@@ -41,6 +42,7 @@ import { UploadsModule } from "./uploads/uploads.module.js";
     MessagingModule,
     ModerationModule,
     RelaisModule,
+    EleveModule,
     SchedulerModule,
   ],
 })

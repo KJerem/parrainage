@@ -23,8 +23,10 @@ export class UploadsCleanupService {
     const stale = await this.prisma.media.findMany({
       where: {
         createdAt: { lt: staleUploadCutoff(at) },
-        uploadedByUserId: { not: null },
-        kind: { in: [...uploadKinds] },
+        // Un média du seed n'a aucun des deux : il n'est pas concerné.
+        AND: [{ OR: [{ uploadedByUserId: { not: null } }, { uploadedByChildId: { not: null } }] }],
+        // Bulletin d'un enfant : page dont le message a été retiré par la modération.
+        kind: { in: [...uploadKinds, "BULLETIN"] },
         messageId: null,
         newsPostId: null,
         schoolResultId: null,

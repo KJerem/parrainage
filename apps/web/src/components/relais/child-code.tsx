@@ -3,7 +3,7 @@ import type { ComponentType } from "react";
 import { FishIcon, HeartIcon, HouseIcon, StarIcon, SunIcon, TreeIcon } from "@/components/ui";
 import { cn } from "@/lib/cn";
 
-const icons: Readonly<Record<ChildCodeImage, ComponentType<{ size?: number }>>> = {
+export const childCodeIcons: Readonly<Record<ChildCodeImage, ComponentType<{ size?: number }>>> = {
   SOLEIL: SunIcon,
   ARBRE: TreeIcon,
   POISSON: FishIcon,
@@ -19,7 +19,7 @@ export function ChildCodeImages({ code, size = "md" }: { code: ChildCode; size?:
   return (
     <ol className="m-0 flex list-none flex-wrap gap-3 p-0" aria-label="Code image, dans l'ordre">
       {code.map((image, index) => {
-        const Icon = icons[image];
+        const Icon = childCodeIcons[image];
         return (
           <li
             key={image}

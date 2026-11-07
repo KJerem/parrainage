@@ -306,7 +306,7 @@ test.describe("Messagerie", () => {
       .click();
     await expect(koffi.page).toHaveURL("/relais/messages");
     const tabs = koffi.page.getByRole("tablist", { name: "Filtrer les conversations" });
-    await expect(tabs.getByRole("tab")).toHaveText(["Parrains", "Bureau"]);
+    await expect(tabs.getByRole("tab")).toHaveText(["Parrains", "Bureau", "Enfants"]);
     await expect(tabs.getByRole("tab", { name: "Parrains" })).toHaveAttribute(
       "aria-selected",
       "true",
@@ -435,10 +435,11 @@ test.describe("Messagerie", () => {
     }
     await paul.context.close();
 
-    // Le relais ne lit pas encore les conversations des enfants (onglet « Enfants », phase 8).
+    // Le relais d'Aïcha suit sa conversation, mais ne peut pas y écrire.
     const koffi = await openAs(browser, testInfo, koffiState);
     const response = await koffi.page.goto(`/relais/messages/${AICHA_CONVERSATION}`);
-    expect(response?.status()).toBe(404);
+    expect(response?.status()).toBe(200);
+    await expect(koffi.page.getByRole("textbox")).toHaveCount(0);
     await koffi.context.close();
   });
 });

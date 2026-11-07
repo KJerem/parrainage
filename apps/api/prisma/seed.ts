@@ -9,6 +9,7 @@ import { createS3Client } from "../src/storage/s3-client.js";
 import { buildSeedContent, type SeedContent, type SeedUpload } from "./seed/content.js";
 import { buildSeedData, type SeedUser } from "./seed/data.js";
 import { seedToday } from "./seed/dates.js";
+import { buildSeedSessions, seedChildCode } from "./seed/sessions.js";
 
 // Jour de référence : SEED_TODAY, sinon le jour de l'horloge figée APP_NOW, sinon aujourd'hui.
 const today = seedToday(process.env.SEED_TODAY || process.env.APP_NOW);
@@ -150,14 +151,6 @@ async function seedContent(content: SeedContent): Promise<{ uploaded: number }> 
       create: { id, ...fields },
     }),
   );
-  // Code image d'Aïcha, celui du design : les autres enfants l'obtiennent par leur relais.
-  await prisma.child.update({
-    where: { id: "seed-child-aicha" },
-    data: {
-      codeHash: await hashChildCode(["SOLEIL", "ARBRE", "POISSON"], getEnv().CHILD_CODE_PEPPER),
-      codeSetAt: today,
-    },
-  });
 
   await prisma.media.deleteMany({ where: stale(media.map((m) => m.id)) });
   await prisma.message.deleteMany({ where: stale(content.messages.map((m) => m.id)) });
@@ -220,6 +213,52 @@ async function seedContent(content: SeedContent): Promise<{ uploaded: number }> 
   return { uploaded: uploaded.size };
 }
 
+/**
+ * Sessions élèves et codes image des enfants de M. Koffi (Aïcha garde celui du design). Les
+ * sessions laissées par les tests et les verrous repartent de zéro : aucun poste ne reste ouvert.
+ */
+async function seedSessions(data: ReturnType<typeof buildSeedData>): Promise<void> {
+  const sessions = buildSeedSessions(today, data);
+  const resetTests = process.env.SEED_RESET_MESSAGES === "1";
+  await prisma.classSession.deleteMany({
+    where: {
+      OR: [
+        { status: "OPEN" },
+        { id: { startsWith: SEED_PREFIX, notIn: sessions.map((session) => session.id) } },
+        ...(resetTests ? [{ NOT: { id: { startsWith: SEED_PREFIX } } }] : []),
+      ],
+    },
+  });
+  await prisma.child.updateMany({ data: { failedCodeAttempts: 0, codeLockedAt: null } });
+  const pepper = getEnv().CHILD_CODE_PEPPER;
+  const koffiChildren = data.children.filter((child) => child.relaisId === "seed-relais-koffi");
+  for (const [index, child] of koffiChildren.entries()) {
+    await prisma.child.update({
+      where: { id: child.id },
+      data: {
+        codeHash: await hashChildCode(seedChildCode(child.id, index), pepper),
+        codeSetAt: today,
+      },
+    });
+  }
+  for (const { id, childIds, ...fields } of sessions) {
+    await prisma.classSession.upsert({
+      where: { id },
+      update: { ...fields, failedAttempts: 0, suspendedAt: null, deviceTokenHash: null },
+      create: { id, ...fields },
+    });
+    await prisma.classSessionChild.deleteMany({ where: { sessionId: id } });
+    await prisma.classSessionChild.createMany({
+      data: childIds.map((childId) => ({ sessionId: id, childId })),
+    });
+  }
+  // Fils vers l'association créés par les tests (la démonstration n'en contient aucun).
+  if (resetTests) {
+    await prisma.conversation.deleteMany({ where: { id: { startsWith: "child-assoc-" } } });
+    await prisma.rateLimit.deleteMany({ where: { key: { startsWith: "messages:child:" } } });
+  }
+}
+
 async function main() {
   const data = buildSeedData(today);
 
@@ -262,6 +301,7 @@ async function main() {
 
   const content = buildSeedContent(today, data);
   const { uploaded } = await seedContent(content);
+  await seedSessions(data);
 
   // Compteurs d'envoi de messages des comptes de démonstration remis à zéro (tests répétés).
   await prisma.rateLimit.deleteMany({ where: { key: { startsWith: "messages:seed-user-" } } });

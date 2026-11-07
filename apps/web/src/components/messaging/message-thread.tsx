@@ -18,6 +18,7 @@ import { cn } from "@/lib/cn";
 import { features } from "@/lib/features";
 import { civilDayKey, formatClock, formatDaySeparator } from "@/lib/format";
 import { DaySeparator, MessageItem } from "./chat-bubble";
+import { RelaisFlagButton } from "./relais-flag";
 import { Composer } from "./composer";
 import { recipientName, threadSubtitle } from "./messaging-labels";
 
@@ -253,6 +254,13 @@ export function MessageThread({
               recipient={recipient}
               srIntro={srIntro(message, page.now, timeZone)}
               showDelivery={message.id === lastId}
+              actions={
+                conversation.access === "supervisor" &&
+                message.author.kind === "child" &&
+                message.status === "en_relecture" ? (
+                  <RelaisFlagButton messageId={message.id} />
+                ) : null
+              }
             />
           </Fragment>
         ))}

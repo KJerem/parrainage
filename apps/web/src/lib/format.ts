@@ -170,6 +170,11 @@ export function formatRelativeDay(
 }
 
 /** Jour de la semaine et date : « Samedi 31 octobre ». */
+/** « mardi » */
+export function formatWeekday(date: Date | string, timeZone = PARRAIN_TIME_ZONE): string {
+  return new Intl.DateTimeFormat(LOCALE, { weekday: "long", timeZone }).format(new Date(date));
+}
+
 export function formatWeekdayDate(date: Date | string, timeZone = PARRAIN_TIME_ZONE): string {
   return capitalize(
     new Intl.DateTimeFormat(LOCALE, {
@@ -236,6 +241,11 @@ export function formatClock(date: Date | string, timeZone = PARRAIN_TIME_ZONE): 
     clockFormats.set(timeZone, format);
   }
   return format.format(new Date(date));
+}
+
+/** Heure « 16 h 00 », « 9 h 30 » dans le fuseau, comme l'écrivent les écrans des sessions élèves. */
+export function formatHour(date: Date | string, timeZone = PARRAIN_TIME_ZONE): string {
+  return formatClock(date, timeZone).replace(/^0/, "").replace(":", " h ");
 }
 
 /** Jour civil « 2026-10-30 » dans le fuseau : regroupe les messages d'un même jour. */

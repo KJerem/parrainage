@@ -552,10 +552,7 @@ test("la saisie passe d'un tableau défilant à des cartes selon la largeur", as
   await expect(visible(page.getByLabel(/Moyenne Aïcha/))).toBeVisible();
 });
 
-test("les rubriques encore à venir gardent leur page d'attente", async ({ page }) => {
-  const response = await page.goto("/relais/sessions");
-  expect(response?.status()).toBe(200);
-  await expect(page.getByText("Cette rubrique arrive bientôt")).toBeVisible();
+test("une adresse inconnue répond 404", async ({ page }) => {
   const unknown = await page.goto("/relais/nimporte");
   expect(unknown?.status()).toBe(404);
 });

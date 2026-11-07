@@ -4,6 +4,7 @@ import {
   formatAge,
   formatAverage,
   formatClock,
+  formatHour,
   formatDayMonth,
   formatDaysAgo,
   formatDaySeparator,
@@ -195,5 +196,13 @@ describe("formatWeekdayDate", () => {
   it("écrit le jour et la date, dans le fuseau demandé", () => {
     expect(formatWeekdayDate("2026-10-31T10:00:00Z", RELAIS_TIME_ZONE)).toBe("Samedi 31 octobre");
     expect(formatWeekdayDate("2026-10-31T23:30:00Z")).toBe("Dimanche 1 novembre");
+  });
+});
+
+describe("formatHour", () => {
+  it("écrit l'heure comme les écrans des sessions élèves", () => {
+    expect(formatHour("2026-10-31T16:00:00Z", "Africa/Lome")).toBe("16 h 00");
+    expect(formatHour("2026-11-10T09:30:00Z", "Africa/Lome")).toBe("9 h 30");
+    expect(formatHour("2026-11-10T00:05:00Z", "Africa/Lome")).toBe("0 h 05");
   });
 });

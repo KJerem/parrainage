@@ -1,7 +1,7 @@
 import type { RelaisHome } from "@parrainage/contracts";
 import Link from "next/link";
 import { Button, StatTile } from "@/components/ui";
-import { formatDayMonth, formatWeekdayDate, RELAIS_TIME_ZONE } from "@/lib/format";
+import { formatDayMonth, formatWeekday, formatWeekdayDate, RELAIS_TIME_ZONE } from "@/lib/format";
 import { ChildrenTable } from "./children-table";
 import { PendingList } from "./offline-status";
 import { RelaisHomeMobile } from "./relais-home-mobile";
@@ -10,7 +10,7 @@ const plural = (count: number, one: string, many: string) => (count > 1 ? many :
 
 function TodoCard({ home }: { home: RelaisHome }) {
   const { bulletinsToEnter } = home.stats;
-  const { bulletinsDue, draftCount } = home;
+  const { bulletinsDue, draftCount, nextSession } = home;
   return (
     <section
       aria-labelledby="a-faire"
@@ -54,7 +54,21 @@ function TodoCard({ home }: { home: RelaisHome }) {
           </span>
         </Link>
       ) : null}
-      {bulletinsToEnter === 0 && draftCount === 0 ? (
+      {nextSession ? (
+        <Link
+          href={`/relais/sessions?planifiee=${encodeURIComponent(nextSession.id)}`}
+          className="flex flex-col rounded-10 bg-brand-100 p-3 text-ink no-underline hover:text-ink"
+        >
+          <strong className="text-14">
+            Session d&apos;écriture {formatWeekday(nextSession.scheduledAt, RELAIS_TIME_ZONE)}
+          </strong>
+          <span className="text-13 text-brand-700">
+            {nextSession.childCount}{" "}
+            {plural(nextSession.childCount, "enfant inscrit", "enfants inscrits")}
+          </span>
+        </Link>
+      ) : null}
+      {bulletinsToEnter === 0 && draftCount === 0 && !nextSession ? (
         <p className="m-0 text-14 text-ink-soft">Rien d&apos;urgent pour le moment.</p>
       ) : null}
     </section>

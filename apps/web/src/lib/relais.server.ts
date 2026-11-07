@@ -5,6 +5,7 @@ import {
   relaisChildListSchema,
   relaisHomeSchema,
   relaisResultsSchema,
+  relaisSessionsSchema,
   roleHome,
   scheduledNewsListSchema,
   schoolListSchema,
@@ -34,6 +35,8 @@ async function getRelais<T>(path: string, schema: z.ZodType<T>): Promise<T> {
 }
 
 export const getRelaisHome = () => getRelais("/api/relais/home", relaisHomeSchema);
+
+export const getRelaisSessions = () => getRelais("/api/relais/sessions", relaisSessionsSchema);
 
 export const getRelaisChildren = () => getRelais("/api/relais/children", relaisChildListSchema);
 

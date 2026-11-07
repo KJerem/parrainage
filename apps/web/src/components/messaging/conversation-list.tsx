@@ -150,6 +150,12 @@ function ConversationItem({ item, href, selected, now, timeZone, compact }: Conv
       />
       <span className="flex min-w-0 flex-1 flex-col">
         <strong className="text-15 [overflow-wrap:anywhere]">{name}</strong>
+        {item.access === "supervisor" && counterpart.subtitle ? (
+          // Conversation d'un enfant suivie par le relais : avec quel parrain (Kofi en a deux).
+          <span className="text-12 [overflow-wrap:anywhere] text-muted">
+            {counterpart.subtitle}
+          </span>
+        ) : null}
         <span className="flex items-baseline gap-2">
           <span
             className={cn(

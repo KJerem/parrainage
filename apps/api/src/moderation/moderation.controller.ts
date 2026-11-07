@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Header, HttpCode, Param, Post, Query } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Header,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+} from "@nestjs/common";
 import {
   type ModerationDecision,
   type ModerationDecisionResult,
@@ -13,6 +23,8 @@ import {
   type ModerationSummary,
 } from "@parrainage/contracts";
 import { Roles, Session, type UserSession } from "@thallesp/nestjs-better-auth";
+import { loadActor } from "../auth/actor.js";
+import { PrismaService } from "../prisma/prisma.service.js";
 import { ModerationService } from "./moderation.service.js";
 
 /**
@@ -62,5 +74,33 @@ export class ModerationController {
     @Body({ schema: moderationFlagSchema }) input: ModerationFlag,
   ): Promise<ModerationFlagResult> {
     return this.moderation.flag(session.user.id, id, input);
+  }
+}
+
+/** Signalement par le relais, depuis la conversation d'un de ses enfants (onglet « Enfants »). */
+@Controller("relais/messages")
+@Roles(["relais"])
+export class RelaisModerationController {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly moderation: ModerationService,
+  ) {}
+
+  @Post(":id/flag")
+  @HttpCode(200)
+  async flag(
+    @Session() session: UserSession,
+    @Param("id") id: string,
+    @Body({ schema: moderationFlagSchema }) input: ModerationFlag,
+  ): Promise<ModerationFlagResult> {
+    const actor = await loadActor(this.prisma, session.user);
+    if (!actor?.relaisId) {
+      throw new ForbiddenException();
+    }
+    return this.moderation.flagAsRelais(
+      { userId: actor.userId, relaisId: actor.relaisId },
+      id,
+      input,
+    );
   }
 }

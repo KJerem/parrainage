@@ -471,9 +471,8 @@ describe("Modération (e2e)", () => {
       const mail = await waitForNewMessage(ACCOUNTS.koffi, knownRelais);
       expect(mail.subject).toBe("Le message d'un enfant n'a pas été transmis");
       expect(mail.text).toContain("Motif : Contenu inadapté.");
-      // La page Messages, tant que la conversation d'un enfant n'a pas son onglet (404 sinon).
-      expect(mail.text).toContain("/relais/messages");
-      expect(mail.text).not.toContain(AICHA_CLAIRE);
+      // Le relais suit la conversation de son enfant : le lien y mène directement.
+      expect(mail.text).toContain(`/relais/messages/${AICHA_CLAIRE}`);
       expect(`${mail.text}${mail.html}`).not.toMatch(/SECRET|Aïcha/);
       await expect(waitForNewMessage(ACCOUNTS.claire, knownClaire, 500)).rejects.toThrow();
       expect((await thread("claire", AICHA_CLAIRE)).map((m) => m.id)).not.toContain(id);

@@ -26,6 +26,7 @@ describe("validateEnv", () => {
         NODE_ENV: "production",
         BETTER_AUTH_SECRET: "x".repeat(44),
         CHILD_CODE_PEPPER: "y".repeat(44),
+        CHILD_SESSION_SECRET: "z".repeat(44),
       }).NODE_ENV,
     ).toBe("production");
   });
@@ -39,6 +40,22 @@ describe("validateEnv", () => {
     expect(() => validateEnv({ ...dev, CHILD_CODE_PEPPER: "court" })).toThrow(
       /au moins 32 caractères/,
     );
+  });
+
+  it("exige en production un vrai secret pour les sessions élèves", () => {
+    expect(() =>
+      validateEnv({
+        ...base,
+        NODE_ENV: "production",
+        BETTER_AUTH_SECRET: "x".repeat(44),
+        CHILD_CODE_PEPPER: "y".repeat(44),
+      }),
+    ).toThrow(/CHILD_SESSION_SECRET : le secret d'exemple est interdit en production/);
+    const dev = validateEnv({ ...base, BETTER_AUTH_SECRET: exampleSecret });
+    expect(dev.CHILD_SESSION_SECRET.length).toBeGreaterThanOrEqual(32);
+    expect(dev.CHILD_CODE_MAX_ATTEMPTS).toBe(3);
+    expect(dev.CHILD_SESSION_MAX_FAILURES).toBe(15);
+    expect(dev.CHILD_VIDEO_MAX_SECONDS).toBe(60);
   });
 
   it("garde les tâches planifiées actives, sauf si on les coupe", () => {

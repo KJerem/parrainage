@@ -985,7 +985,8 @@ export function buildSeedContent(today: Date, data: SeedData): SeedContent {
       ...content,
       notifyParrains: true,
       notifyBureau: false,
-      visibleToChildren: false,
+      // La rentrée d'Aïcha est aussi montrée aux enfants, pendant leur session.
+      visibleToChildren: id === "seed-news-aicha-rentree",
       scheduledAt: null,
       publishedAt,
       sentFrom: news.length % 2 === 0 ? "MOBILE" : "WEB",

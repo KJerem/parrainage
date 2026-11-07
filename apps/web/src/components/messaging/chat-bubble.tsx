@@ -47,10 +47,22 @@ function documentLabel(media: MediaRef): string {
 }
 
 /** Pièce jointe d'un message, 140 × 96 : photo, vidéo ou document (pointillés). */
-export function AttachmentTile({ media }: { media: MediaRef }) {
-  const src = mediaPath(media);
+export function AttachmentTile({
+  media,
+  srcOf,
+}: {
+  media: MediaRef;
+  /** Autre chemin de lecture (espace enfant) ; sinon /api/media. */
+  srcOf?: (media: MediaRef) => string | null;
+}) {
+  const src = srcOf ? srcOf(media) : mediaPath(media);
   const label = media.label ?? mediaKindLabels[media.kind];
-  if (media.kind === "PHOTO" || media.kind === "AVATAR") {
+  // Une page de bulletin photographiée s'affiche comme une photo.
+  const isImage =
+    media.kind === "PHOTO" ||
+    media.kind === "AVATAR" ||
+    (media.kind === "BULLETIN" && media.mimeType.startsWith("image/"));
+  if (isImage) {
     return src ? (
       <a
         href={src}
@@ -93,7 +105,7 @@ export function AttachmentTile({ media }: { media: MediaRef }) {
   const dashed = cn(tileBase, "border border-dashed border-line-strong text-ink");
   return src ? (
     <a
-      href={mediaPath(media, { download: true }) ?? src}
+      href={srcOf ? src : (mediaPath(media, { download: true }) ?? src)}
       className={cn(dashed, "no-underline transition-colors hover:bg-canvas hover:text-ink")}
     >
       <span className="max-w-full break-words">{document}</span>
@@ -124,6 +136,8 @@ export type MessageItemProps = {
    * évidents) ; « En relecture » et « Retenu » restent toujours visibles.
    */
   showDelivery?: boolean;
+  /** Action sous le message (signalement par le relais). */
+  actions?: ReactNode;
 };
 
 /** Un message du fil : bulle, pièces jointes, puis le suivi pour son auteur. */
@@ -132,6 +146,7 @@ export function MessageItem({
   recipient,
   srIntro,
   showDelivery = true,
+  actions,
 }: MessageItemProps) {
   const mine = message.side === "me";
   const status =
@@ -184,6 +199,7 @@ export function MessageItem({
             : null}
         </p>
       ) : null}
+      {actions}
     </article>
   );
 }

@@ -130,6 +130,14 @@ export const relaisHomeSchema = z.object({
     .nullable(),
   draftCount: z.number().int().nonnegative(),
   children: z.array(relaisChildRowSchema),
+  /** Prochaine session élève planifiée (« Session d'écriture mardi »). */
+  nextSession: z
+    .object({
+      id: z.string().min(1),
+      scheduledAt: isoDateTime,
+      childCount: z.number().int().nonnegative(),
+    })
+    .nullable(),
   now: isoDateTime,
 });
 

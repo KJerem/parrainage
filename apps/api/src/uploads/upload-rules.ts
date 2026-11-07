@@ -75,6 +75,18 @@ export function validateUploadRequest(input: CreateUpload, role: Role, limits: U
         : "Vous ne pouvez pas envoyer ce fichier",
     );
   }
+  validateUploadFile(input, limits);
+}
+
+/** Un enfant ne joint un fichier qu'à un message, avec les mêmes plafonds qu'un adulte. */
+export function validateChildUploadRequest(input: CreateUpload, limits: UploadLimits): void {
+  if (input.purpose !== "message") {
+    throw new AppError(403, "Tu ne peux pas envoyer ce fichier");
+  }
+  validateUploadFile(input, limits);
+}
+
+function validateUploadFile(input: CreateUpload, limits: UploadLimits): void {
   if (!uploadMimeTypes[input.kind].includes(input.mimeType)) {
     throw new AppError(422, TYPE_REJECTED_MESSAGE, { mimeType: [TYPE_REJECTED_MESSAGE] });
   }

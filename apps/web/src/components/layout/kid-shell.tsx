@@ -39,6 +39,8 @@ export type KidShellProps = {
   /** Lien « J'ai fini » (fin de session). */
   finishHref?: string;
   finishLabel?: string;
+  /** « J'ai fini » quand il faut d'abord prévenir l'API (espace enfant). */
+  finish?: ReactNode;
   mainClassName?: string;
   children: ReactNode;
 };
@@ -57,6 +59,7 @@ export function KidShell({
   backLabel = "Retour",
   finishHref,
   finishLabel = "J'ai fini",
+  finish,
   mainClassName,
   children,
 }: KidShellProps) {
@@ -89,6 +92,7 @@ export function KidShell({
               {finishLabel}
             </Button>
           ) : null}
+          {finish}
         </div>
       </header>
       <main

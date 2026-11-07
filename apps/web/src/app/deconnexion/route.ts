@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { api, appOrigin } from "@/lib/api.server";
-import { LOGIN_PATH } from "@/lib/auth-paths";
+import { ELEVE_HOME, LOGIN_PATH } from "@/lib/auth-paths";
 
 const AUTH_COOKIE = /^(__Secure-)?better-auth\./;
 const SESSION_COOKIES = ["better-auth.session_token", "__Secure-better-auth.session_token"];
@@ -8,7 +8,7 @@ const SESSION_COOKIES = ["better-auth.session_token", "__Secure-better-auth.sess
 /**
  * Déconnexion sans JavaScript : formulaire POST du menu de compte. La session est révoquée
  * auprès de l'API, puis les cookies de Better Auth sont effacés et le visiteur renvoyé (303)
- * vers la connexion.
+ * vers la connexion (`?vers=poste` : vers l'écran des élèves, si le relais rend le poste).
  */
 export async function POST(request: NextRequest) {
   // Un formulaire d'un autre site ne doit pas pouvoir déconnecter le visiteur.
@@ -43,7 +43,10 @@ export async function POST(request: NextRequest) {
   // le poste, même si le JavaScript de la page n'a pas pu faire la purge.
   const response = new NextResponse(null, {
     status: 303,
-    headers: { Location: LOGIN_PATH, "Clear-Site-Data": '"storage"' },
+    headers: {
+      Location: request.nextUrl.searchParams.get("vers") === "poste" ? ELEVE_HOME : LOGIN_PATH,
+      "Clear-Site-Data": '"storage"',
+    },
   });
   for (const name of new Set([...SESSION_COOKIES, ...authCookies])) {
     response.cookies.set(name, "", {

@@ -57,6 +57,8 @@ export type PutBlob = (
 export type UploadOptions = {
   /** Usage du fichier, contrôlé par l'API selon le rôle (par défaut : un message). */
   purpose?: UploadPurpose;
+  /** Base de l'API d'envoi : `/api/uploads`, ou celle de l'espace enfant. */
+  basePath?: string;
   onProgress?: (progress: UploadProgress) => void;
   signal?: AbortSignal;
   /** Remplace le PUT par XMLHttpRequest (tests). */
@@ -280,7 +282,7 @@ function abortError(): DOMException {
   return new DOMException("Envoi annulé", "AbortError");
 }
 
-const mediaPath = (mediaId: string) => `/api/uploads/${encodeURIComponent(mediaId)}`;
+const DEFAULT_UPLOADS_PATH = "/api/uploads";
 
 class Uploader {
   private readonly put: PutBlob;
@@ -295,6 +297,14 @@ class Uploader {
   ) {
     this.put = options.put ?? xhrPut;
     this.wait = options.wait ?? defaultWait;
+  }
+
+  private get basePath() {
+    return this.options.basePath ?? DEFAULT_UPLOADS_PATH;
+  }
+
+  private mediaPath(mediaId: string) {
+    return `${this.basePath}/${encodeURIComponent(mediaId)}`;
   }
 
   private report(phase: UploadPhase) {
@@ -340,7 +350,7 @@ class Uploader {
   }
 
   private async fetchParts() {
-    const { data } = await apiFetch(`${mediaPath(this.mediaId)}/parts`, uploadPartsSchema, {
+    const { data } = await apiFetch(`${this.mediaPath(this.mediaId)}/parts`, uploadPartsSchema, {
       signal: this.options.signal,
     });
     this.done.clear();
@@ -379,7 +389,7 @@ class Uploader {
       this.report("verifying");
       try {
         const { data } = await apiFetch(
-          `${mediaPath(this.mediaId)}/complete`,
+          `${this.mediaPath(this.mediaId)}/complete`,
           uploadedMediaSchema,
           {
             method: "POST",
@@ -425,7 +435,7 @@ class Uploader {
       this.done.clear();
     }
 
-    const { data: ticket } = await apiFetch("/api/uploads", uploadTicketSchema, {
+    const { data: ticket } = await apiFetch(this.basePath, uploadTicketSchema, {
       method: "POST",
       signal: this.options.signal,
       body: {

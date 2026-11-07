@@ -25,7 +25,6 @@ export default async function RelaisConversationPage({
   const { conversationId } = await params;
   const open = await openConversation("relais", conversationId);
   const tab = relaisTabOf(open.detail.kind);
-  // Conversations des enfants suivis : onglet « Enfants », livré en phase 8.
   if (!visibleRelaisTabs().includes(tab)) {
     notFound();
   }

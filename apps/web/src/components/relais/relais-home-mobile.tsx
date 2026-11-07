@@ -68,6 +68,7 @@ export function RelaisHomeMobile({ home }: { home: RelaisHome }) {
   const shown = [
     ...todos.filter((todo) => todo.kind === "stale").slice(0, WEEK_TODOS - 1),
     ...todos.filter((todo) => todo.kind === "bulletins"),
+    ...todos.filter((todo) => todo.kind === "session"),
   ];
   return (
     <div className="flex flex-col gap-5 md:hidden">

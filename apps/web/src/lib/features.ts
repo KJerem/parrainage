@@ -14,5 +14,5 @@ export const features: Readonly<Record<Feature, boolean>> = {
   /** Phase 12 : « À quoi a servi votre don ». */
   expenses: false,
   /** Phase 8 : onglet « Enfants » de RW-Messages (conversations des enfants suivis). */
-  childConversations: false,
+  childConversations: true,
 };
