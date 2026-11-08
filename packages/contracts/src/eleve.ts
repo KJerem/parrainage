@@ -265,6 +265,8 @@ export const eleveHomeSchema = z.object({
   rights: classSessionRightsSchema,
   threads: z.array(eleveThreadSchema),
   news: z.array(eleveNewsSchema),
+  /** Prochain appel vidéo confirmé avec un parrain (« Samedi 14 novembre, chez M. Koffi »). */
+  nextCall: z.object({ startsAt: isoDateTime, parrainName: z.string() }).nullable(),
 });
 
 export type EleveHome = z.infer<typeof eleveHomeSchema>;

@@ -181,3 +181,36 @@ export function childSubmittedEmail(url: string): MailContent {
     notes: ["Vérifiez le dossier avant de proposer un parrain."],
   });
 }
+
+/** Demande d'appel vidéo d'un parrain : le lien mène à la conversation, où le relais répond. */
+export function callRequestedEmail(url: string): MailContent {
+  return linkEmail({
+    subject: "Une demande d'appel vidéo",
+    intro: "Un parrain vous demande un appel vidéo avec son filleul.",
+    action: "Répondre à la demande",
+    url,
+    notes: ["Confirmez le créneau demandé, ou proposez-en d'autres."],
+  });
+}
+
+/** Le relais propose d'autres créneaux. */
+export function callSlotsProposedEmail(url: string): MailContent {
+  return linkEmail({
+    subject: "Choisissez un créneau pour votre appel vidéo",
+    intro: "Le relais vous propose d'autres créneaux pour votre appel vidéo.",
+    action: "Choisir un créneau",
+    url,
+    notes: ["Connectez-vous à votre espace pour choisir celui qui vous convient."],
+  });
+}
+
+/** Appel confirmé : le fichier agenda est joint, sans nom ni donnée de l'enfant. */
+export function callConfirmedEmail(url: string): MailContent {
+  return linkEmail({
+    subject: "Appel vidéo confirmé",
+    intro: "L'appel vidéo est confirmé. Ajoutez-le à votre agenda avec le fichier joint.",
+    action: "Voir l'appel",
+    url,
+    notes: ["La salle ouvre quelques minutes avant l'appel. Les appels ne sont pas enregistrés."],
+  });
+}

@@ -58,6 +58,22 @@ describe("validateEnv", () => {
     expect(dev.CHILD_VIDEO_MAX_SECONDS).toBe(60);
   });
 
+  it("ouvre les appels par lien, sauf si JaaS est entièrement configuré", () => {
+    const dev = { ...base, BETTER_AUTH_SECRET: exampleSecret };
+    expect(validateEnv(dev).VISIO_PROVIDER).toBe("link");
+    expect(validateEnv(dev).VISIO_JOIN_EARLY_MINUTES).toBe(10);
+    expect(() => validateEnv({ ...dev, VISIO_PROVIDER: "jaas" })).toThrow(/JAAS_APP_ID/);
+    expect(
+      validateEnv({
+        ...dev,
+        VISIO_PROVIDER: "jaas",
+        JAAS_APP_ID: "vpaas-magic-cookie-test",
+        JAAS_API_KEY_ID: "vpaas-magic-cookie-test/abc",
+        JAAS_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----",
+      }).VISIO_PROVIDER,
+    ).toBe("jaas");
+  });
+
   it("garde les tâches planifiées actives, sauf si on les coupe", () => {
     const dev = { ...base, BETTER_AUTH_SECRET: exampleSecret };
     expect(validateEnv(dev).SCHEDULER_ENABLED).toBe(true);

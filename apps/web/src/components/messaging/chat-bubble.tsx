@@ -155,7 +155,11 @@ export function MessageItem({
         ? message.status
         : null
       : message.status;
-  const hasText = message.body !== null && message.body.trim() !== "";
+  // La confirmation d'un appel se lit sur sa carte : pas de bulle de texte en plus.
+  const hasText =
+    message.body !== null &&
+    message.body.trim() !== "" &&
+    !(message.kind === "SYSTEM" && message.call !== null);
   return (
     <article
       className={cn(

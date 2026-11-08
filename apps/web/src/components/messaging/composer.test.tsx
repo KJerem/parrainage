@@ -16,6 +16,7 @@ const sentMessage = (body: string): ConversationMessage => ({
   createdAt: "2026-10-31T10:00:00.000Z",
   status: "en_relecture",
   moderationReason: null,
+  call: null,
 });
 
 const fetchMock = vi.fn();

@@ -19,6 +19,7 @@ import { features } from "@/lib/features";
 import { civilDayKey, formatClock, formatDaySeparator } from "@/lib/format";
 import { DaySeparator, MessageItem } from "./chat-bubble";
 import { RelaisFlagButton } from "./relais-flag";
+import { CallMessageCard, CallQuickReply } from "@/components/calls/call-message";
 import { Composer } from "./composer";
 import { recipientName, threadSubtitle } from "./messaging-labels";
 
@@ -255,9 +256,11 @@ export function MessageThread({
               srIntro={srIntro(message, page.now, timeZone)}
               showDelivery={message.id === lastId}
               actions={
-                conversation.access === "supervisor" &&
-                message.author.kind === "child" &&
-                message.status === "en_relecture" ? (
+                message.call ? (
+                  <CallMessageCard message={message} variant={variant} />
+                ) : conversation.access === "supervisor" &&
+                  message.author.kind === "child" &&
+                  message.status === "en_relecture" ? (
                   <RelaisFlagButton messageId={message.id} />
                 ) : null
               }
@@ -266,6 +269,9 @@ export function MessageThread({
         ))}
       </div>
 
+      {!parrain && conversation.canWrite && conversation.kind === "PARRAIN_RELAIS" ? (
+        <CallQuickReply messages={messages} parrainName={conversation.counterpart.name} />
+      ) : null}
       {conversation.canWrite ? (
         <Composer
           conversationId={conversation.id}

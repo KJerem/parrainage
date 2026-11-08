@@ -10,7 +10,7 @@ const plural = (count: number, one: string, many: string) => (count > 1 ? many :
 
 function TodoCard({ home }: { home: RelaisHome }) {
   const { bulletinsToEnter } = home.stats;
-  const { bulletinsDue, draftCount, nextSession } = home;
+  const { bulletinsDue, draftCount, nextSession, callRequests } = home;
   return (
     <section
       aria-labelledby="a-faire"
@@ -54,6 +54,22 @@ function TodoCard({ home }: { home: RelaisHome }) {
           </span>
         </Link>
       ) : null}
+      {callRequests.map((request) => (
+        <Link
+          key={request.id}
+          href={
+            request.conversationId
+              ? `/relais/messages/${encodeURIComponent(request.conversationId)}`
+              : "/relais/appels"
+          }
+          className="flex flex-col rounded-10 bg-info-100 p-3 text-ink no-underline hover:text-ink"
+        >
+          <strong className="text-14">Proposer des créneaux d&apos;appel</strong>
+          <span className="text-13 text-info-600">
+            {request.parrainName} ↔ {request.childName}
+          </span>
+        </Link>
+      ))}
       {nextSession ? (
         <Link
           href={`/relais/sessions?planifiee=${encodeURIComponent(nextSession.id)}`}
@@ -68,7 +84,7 @@ function TodoCard({ home }: { home: RelaisHome }) {
           </span>
         </Link>
       ) : null}
-      {bulletinsToEnter === 0 && draftCount === 0 && !nextSession ? (
+      {bulletinsToEnter === 0 && draftCount === 0 && !nextSession && callRequests.length === 0 ? (
         <p className="m-0 text-14 text-ink-soft">Rien d&apos;urgent pour le moment.</p>
       ) : null}
     </section>

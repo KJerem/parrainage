@@ -180,27 +180,43 @@ export class ChildrenService {
     const at = now();
     const monthStart = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), 1));
     const startOfToday = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()));
-    const [children, newsThisMonth, unread, periods, nextSession] = await Promise.all([
-      this.rows(actor, at),
-      this.prisma.newsPost.count({
-        where: {
-          relaisId: actor.relaisId,
-          status: "PUBLISHED",
-          publishedAt: { gte: monthStart, lte: at },
-        },
-      }),
-      this.messaging.unreadTotal(fullActor),
-      schoolYearPeriods(this.prisma, at),
-      this.prisma.classSession.findFirst({
-        where: {
-          relaisId: actor.relaisId,
-          status: "PLANNED",
-          scheduledAt: { gte: startOfToday },
-        },
-        orderBy: { scheduledAt: "asc" },
-        select: { id: true, scheduledAt: true, _count: { select: { children: true } } },
-      }),
-    ]);
+    const [children, newsThisMonth, unread, periods, nextSession, callRequests] = await Promise.all(
+      [
+        this.rows(actor, at),
+        this.prisma.newsPost.count({
+          where: {
+            relaisId: actor.relaisId,
+            status: "PUBLISHED",
+            publishedAt: { gte: monthStart, lte: at },
+          },
+        }),
+        this.messaging.unreadTotal(fullActor),
+        schoolYearPeriods(this.prisma, at),
+        this.prisma.classSession.findFirst({
+          where: {
+            relaisId: actor.relaisId,
+            status: "PLANNED",
+            scheduledAt: { gte: startOfToday },
+          },
+          orderBy: { scheduledAt: "asc" },
+          select: { id: true, scheduledAt: true, _count: { select: { children: true } } },
+        }),
+        this.prisma.callRequest.findMany({
+          where: { relaisId: actor.relaisId, status: "REQUESTED" },
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            conversationId: true,
+            sponsorship: {
+              select: {
+                parrain: { select: { displayName: true } },
+                child: { select: { firstName: true, lastInitial: true } },
+              },
+            },
+          },
+        }),
+      ],
+    );
     const followed = children.filter((child) => FOLLOWED_STATUSES.includes(child.fileStatus));
     const period = currentPeriod(periods, at);
     const entered = period
@@ -227,6 +243,12 @@ export class ChildrenService {
           }
         : null,
       draftCount: children.filter((child) => child.fileStatus === "DRAFT").length,
+      callRequests: callRequests.map((request) => ({
+        id: request.id,
+        parrainName: request.sponsorship.parrain.displayName,
+        childName: `${request.sponsorship.child.firstName} ${request.sponsorship.child.lastInitial}.`,
+        conversationId: request.conversationId,
+      })),
       nextSession: nextSession?.scheduledAt
         ? {
             id: nextSession.id,

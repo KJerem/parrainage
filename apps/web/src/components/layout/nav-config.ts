@@ -63,6 +63,7 @@ export const relaisNav = [
     countLabel: "non lus",
     countLabelOne: "non lu",
   },
+  { key: "appels", href: "/relais/appels", label: "Appels vidéo" },
   { key: "sessions", href: "/relais/sessions", label: "Sessions élèves" },
 ] as const satisfies readonly NavItem[];
 

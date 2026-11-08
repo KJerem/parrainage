@@ -2,6 +2,7 @@
 // montants en centimes, moyennes en centièmes : la mise en forme revient au web.
 import { z } from "zod";
 import { avatarToneSchema } from "./avatar.js";
+import { nextCallSchema } from "./calls.js";
 import { mediaRefSchema } from "./media.js";
 
 /** Éléments du fil affichés sur l'écran principal. */
@@ -202,6 +203,8 @@ export const filleulDashboardSchema = z.object({
   feed: z.array(feedItemSchema),
   results: resultsSummarySchema,
   payments: paymentsSummarySchema,
+  /** Prochain appel vidéo avec ce filleul, ou la demande en cours. */
+  nextCall: nextCallSchema.nullable(),
 });
 
 export type FilleulDashboard = z.infer<typeof filleulDashboardSchema>;

@@ -105,7 +105,7 @@ export function childSummaryLabel(
 
 export type RelaisTodo = {
   key: string;
-  kind: "stale" | "bulletins" | "drafts" | "messages" | "session";
+  kind: "stale" | "bulletins" | "drafts" | "messages" | "session" | "call";
   title: string;
   detail: string;
   href: string;
@@ -162,6 +162,17 @@ export function relaisTodos(home: RelaisHome): RelaisTodo[] {
           },
         ]
       : [];
+  const calls: RelaisTodo[] = home.callRequests.map((request) => ({
+    key: `call-${request.id}`,
+    kind: "call",
+    title: "Appel vidéo demandé",
+    detail: `${request.parrainName} ↔ ${request.childName} · proposer un créneau`,
+    href: request.conversationId
+      ? `/relais/messages/${encodeURIComponent(request.conversationId)}`
+      : "/relais/appels",
+    badge: initials(request.childName),
+    tone: "info",
+  }));
   const session: RelaisTodo[] = home.nextSession
     ? [
         {
@@ -189,7 +200,7 @@ export function relaisTodos(home: RelaisHome): RelaisTodo[] {
           },
         ]
       : [];
-  return [...messages, ...stale, ...bulletins, ...session, ...drafts];
+  return [...messages, ...stale, ...bulletins, ...calls, ...session, ...drafts];
 }
 
 const QUICK_CHILDREN = 3;

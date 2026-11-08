@@ -396,6 +396,7 @@ export default function ComposantsPage() {
               createdAt: "2026-10-30T15:00:00.000Z",
               status: null,
               moderationReason: null,
+              call: null,
             }}
           />
           <MessageItem
@@ -413,6 +414,7 @@ export default function ComposantsPage() {
               createdAt: "2026-10-31T10:00:00.000Z",
               status: "en_relecture",
               moderationReason: null,
+              call: null,
             }}
           />
         </div>

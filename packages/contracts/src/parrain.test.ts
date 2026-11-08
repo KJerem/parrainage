@@ -109,6 +109,7 @@ describe("filleulDashboardSchema", () => {
       feed: [],
       results: { previous: null, current: null, appreciation: null },
       payments: { year: 2026, monthlyAmountCents: 2500, paidThisYearCents: 0, lastMonths: [] },
+      nextCall: null,
     };
     expect(filleulDashboardSchema.parse(dashboard)).toEqual(dashboard);
     expect(

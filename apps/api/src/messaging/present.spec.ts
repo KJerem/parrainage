@@ -68,6 +68,7 @@ const message = (overrides: Partial<MessageRow>): MessageRow => ({
   moderationReason: null,
   sentFrom: "WEB",
   createdAt: new Date("2026-10-28T19:00:00Z"),
+  callRequest: null,
   authorUserId: "u-claire",
   authorChildId: null,
   authorUser: {

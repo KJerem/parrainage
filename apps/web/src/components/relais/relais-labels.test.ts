@@ -133,6 +133,7 @@ describe("relaisTodos", () => {
     draftCount: 0,
     children: [],
     nextSession: null,
+    callRequests: [],
     now,
     ...overrides,
   });
@@ -182,6 +183,23 @@ describe("relaisTodos", () => {
       ["bulletins", "Bulletins du 1er trimestre", "7 enfants sur 18 restent à saisir"],
       ["drafts", "Dossier à terminer", "Pas encore envoyé au bureau"],
     ]);
+  });
+
+  it("annonce les demandes d'appel, vers leur conversation", () => {
+    const [todo] = relaisTodos(
+      home({
+        callRequests: [
+          { id: "r", parrainName: "Claire M.", childName: "Aïcha S.", conversationId: "c 1" },
+        ],
+      }),
+    );
+    expect(todo).toMatchObject({
+      kind: "call",
+      title: "Appel vidéo demandé",
+      detail: "Claire M. ↔ Aïcha S. · proposer un créneau",
+      href: "/relais/messages/c%201",
+      badge: "AS",
+    });
   });
 
   it("annonce la prochaine session élève", () => {

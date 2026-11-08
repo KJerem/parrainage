@@ -51,6 +51,8 @@ model User {
   enteredResults   SchoolResult[]            @relation("SchoolResultEnteredBy")
   recordedConsents ConsentRecord[]           @relation("ConsentRecordedBy")
   classSessions    ClassSession[]            @relation("ClassSessionCreatedBy")
+  callSlots        CallSlot[]                @relation("CallSlotCreatedBy")
+  callRequests     CallRequest[]             @relation("CallRequestCreatedBy")
 
   @@unique([email])
   @@map("user")
@@ -155,6 +157,9 @@ model Relais {
   newsPosts     NewsPost[]
   conversations Conversation[]
   classSessions ClassSession[]
+  callSlots     CallSlot[]
+  callRequests  CallRequest[]
+  videoCalls    VideoCall[]
 }
 
 model School {
@@ -308,6 +313,8 @@ model Sponsorship {
 
   conversation Conversation?
   payments     Payment[]
+  callRequests CallRequest[]
+  videoCalls   VideoCall[]
 
   @@index([childId, status])
   @@index([parrainId, status])
@@ -616,6 +623,9 @@ model Message {
   authorUser       User?            @relation("MessageAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
   authorChildId    String?
   authorChild      Child?           @relation("MessageAuthorChild", fields: [authorChildId], references: [id], onDelete: SetNull)
+  /// Demande d'appel dont parle le message (CALL_REQUEST, CALL_SLOTS, confirmation).
+  callRequestId    String?
+  callRequest      CallRequest?     @relation(fields: [callRequestId], references: [id], onDelete: SetNull)
   createdAt        DateTime         @default(now())
 
   media Media[]
@@ -624,6 +634,7 @@ model Message {
   @@index([moderationStatus, createdAt])
   @@index([authorUserId])
   @@index([authorChildId, createdAt])
+  @@index([callRequestId])
   @@index([reviewedById])
 }
 
@@ -679,6 +690,105 @@ model ClassSessionChild {
 
   @@id([sessionId, childId])
   @@index([childId])
+}
+
+enum CallSlotStatus {
+  OPEN
+  HELD
+  BOOKED
+  CANCELLED
+}
+
+enum CallRequestStatus {
+  REQUESTED
+  SLOTS_PROPOSED
+  CONFIRMED
+  CANCELLED
+  DECLINED
+}
+
+enum VideoCallStatus {
+  SCHEDULED
+  ENDED
+  CANCELLED
+}
+
+/// Disponibilité d'appel publiée par un relais : une heure de début (UTC), la durée vient de la
+/// demande. HELD : réservée pour une demande (choisie par le parrain ou proposée par le relais).
+model CallSlot {
+  id          String         @id @default(cuid())
+  relaisId    String
+  relais      Relais         @relation(fields: [relaisId], references: [id], onDelete: Restrict)
+  startsAt    DateTime
+  status      CallSlotStatus @default(OPEN)
+  heldForId   String?
+  heldFor     CallRequest?   @relation("CallSlotHeldFor", fields: [heldForId], references: [id], onDelete: SetNull)
+  createdById String
+  createdBy   User           @relation("CallSlotCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  requestedBy CallRequest[] @relation("CallRequestSlot")
+  call        VideoCall?
+
+  @@unique([relaisId, startsAt])
+  @@index([relaisId, status, startsAt])
+  @@index([heldForId])
+  @@index([createdById])
+}
+
+/// Demande d'appel d'un parrain avec son filleul : une seule en cours par binôme.
+model CallRequest {
+  id              String            @id @default(cuid())
+  sponsorshipId   String
+  sponsorship     Sponsorship       @relation(fields: [sponsorshipId], references: [id], onDelete: Restrict)
+  relaisId        String
+  relais          Relais            @relation(fields: [relaisId], references: [id], onDelete: Restrict)
+  status          CallRequestStatus @default(REQUESTED)
+  /// Créneau choisi par le parrain (REQUESTED), puis celui de l'appel (CONFIRMED).
+  slotId          String?
+  slot            CallSlot?         @relation("CallRequestSlot", fields: [slotId], references: [id], onDelete: SetNull)
+  durationMinutes Int
+  note            String            @default("")
+  conversationId  String?
+  createdById     String
+  createdBy       User              @relation("CallRequestCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  heldSlots CallSlot[] @relation("CallSlotHeldFor")
+  call      VideoCall?
+  messages  Message[]
+
+  @@index([sponsorshipId, status])
+  @@index([relaisId, status])
+  @@index([slotId])
+  @@index([createdById])
+}
+
+/// Appel vidéo confirmé. La salle porte un nom aléatoire ; aucun enregistrement.
+model VideoCall {
+  id              String          @id @default(cuid())
+  requestId       String?         @unique
+  request         CallRequest?    @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  sponsorshipId   String
+  sponsorship     Sponsorship     @relation(fields: [sponsorshipId], references: [id], onDelete: Restrict)
+  relaisId        String
+  relais          Relais          @relation(fields: [relaisId], references: [id], onDelete: Restrict)
+  slotId          String?         @unique
+  slot            CallSlot?       @relation(fields: [slotId], references: [id], onDelete: SetNull)
+  startsAt        DateTime
+  durationMinutes Int
+  roomName        String          @unique
+  status          VideoCallStatus @default(SCHEDULED)
+  joinedRelaisAt  DateTime?
+  joinedParrainAt DateTime?
+  endedAt         DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([sponsorshipId, startsAt])
+  @@index([relaisId, startsAt])
 }
 
 enum PaymentKind {

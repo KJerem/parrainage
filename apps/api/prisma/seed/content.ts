@@ -86,7 +86,7 @@ export interface SeedConversation {
 export interface SeedMessage {
   id: string;
   conversationId: string;
-  kind: "TEXT" | "NEWSLETTER";
+  kind: "TEXT" | "NEWSLETTER" | "CALL_REQUEST";
   body: string;
   /**
    * Enfant ↔ parrain : relu (APPROVED, HELD) ou en file de modération (PENDING) ; entre adultes :
@@ -801,6 +801,8 @@ export function buildSeedContent(today: Date, data: SeedData): SeedContent {
       "Bonjour M. Koffi, serait-il possible d'organiser un appel avec Aïcha avant Noël ? Je suis disponible le week-end.",
       claireRequestAt,
       null,
+      // Rattachée à sa demande d'appel par le seed des appels (prisma/seed/calls.ts).
+      "CALL_REQUEST",
     ),
     adultMessage(
       "koffi-to-claire",

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { TwoColumnParrain } from "@/components/layout";
+import { NextCallCard } from "@/components/calls/next-call-card";
 import { FilleulSwitcher } from "@/components/parrain/filleul-switcher";
 import { LatestNews } from "@/components/parrain/latest-news";
 import { PaymentsCard } from "@/components/parrain/payments-card";
@@ -16,8 +17,7 @@ export async function generateMetadata({ searchParams }: PageProps<"/parrain">):
   };
 }
 
-// Main.dc.html. Sous lg : profil, nouvelles, résultats puis versements (la carte du prochain
-// appel, phase 9, se glissera après le profil).
+// Main.dc.html. Sous lg : profil, prochain appel, nouvelles, résultats puis versements.
 export default async function ParrainHomePage({ searchParams }: PageProps<"/parrain">) {
   const me = await requireRole("parrain");
   const firstName = (me.parrain?.displayName ?? me.user.name).split(/\s+/)[0];
@@ -40,6 +40,13 @@ export default async function ParrainHomePage({ searchParams }: PageProps<"/parr
           asideLabel="Résultats et versements"
           aside={
             <>
+              {dashboard.nextCall ? (
+                <NextCallCard
+                  call={dashboard.nextCall}
+                  childId={dashboard.child.id}
+                  className="max-lg:hidden"
+                />
+              ) : null}
               <ResultsCard
                 childId={dashboard.child.id}
                 firstName={dashboard.child.firstName}
@@ -50,6 +57,13 @@ export default async function ParrainHomePage({ searchParams }: PageProps<"/parr
           }
         >
           <FilleulProfileCard child={dashboard.child} conversationId={dashboard.conversationId} />
+          {dashboard.nextCall ? (
+            <NextCallCard
+              call={dashboard.nextCall}
+              childId={dashboard.child.id}
+              className="lg:hidden"
+            />
+          ) : null}
           <LatestNews dashboard={dashboard} />
         </TwoColumnParrain>
       ) : (

@@ -46,6 +46,18 @@ export const envSchema = z
     CHILD_SESSION_MAX_FAILURES: z.coerce.number().int().positive().default(15),
     /** Durée maximale d'une vidéo envoyée par un enfant. */
     CHILD_VIDEO_MAX_SECONDS: z.coerce.number().int().positive().default(60),
+    /**
+     * Visio : « jaas » (salle 8x8.vc intégrée, jeton RS256) ou « link » (lien vers une salle Jitsi
+     * publique au nom aléatoire : tests et repli). JaaS exige l'App ID, l'identifiant de la clé et
+     * la clé privée (PEM, retours à la ligne écrits « \n » dans le fichier .env).
+     */
+    VISIO_PROVIDER: z.enum(["jaas", "link"]).default("link"),
+    VISIO_LINK_BASE: z.url().default("https://meet.jit.si"),
+    JAAS_APP_ID: z.string().default(""),
+    JAAS_API_KEY_ID: z.string().default(""),
+    JAAS_PRIVATE_KEY: z.string().default(""),
+    /** La salle ouvre ce nombre de minutes avant l'appel. */
+    VISIO_JOIN_EARLY_MINUTES: z.coerce.number().int().min(0).max(60).default(10),
     /** Tâches planifiées (publication programmée, purge des fichiers) : « false » pour les couper. */
     SCHEDULER_ENABLED: z.stringbool().default(true),
     /** Horloge figée (démo, e2e) : « 2026-10-31T10:00:00Z ». Vide : heure réelle. */
@@ -68,6 +80,15 @@ export const envSchema = z
     {
       path: ["CHILD_CODE_PEPPER"],
       message: "CHILD_CODE_PEPPER : le secret d'exemple est interdit en production",
+    },
+  )
+  .refine(
+    (env) =>
+      env.VISIO_PROVIDER !== "jaas" ||
+      (env.JAAS_APP_ID !== "" && env.JAAS_API_KEY_ID !== "" && env.JAAS_PRIVATE_KEY !== ""),
+    {
+      path: ["VISIO_PROVIDER"],
+      message: "VISIO_PROVIDER=jaas : JAAS_APP_ID, JAAS_API_KEY_ID et JAAS_PRIVATE_KEY sont requis",
     },
   )
   .refine(

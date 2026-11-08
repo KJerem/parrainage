@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { callHour, callLongDay } from "@/components/calls/call-labels";
 import { FinishButton, SessionWatch } from "@/components/eleve/eleve-chrome";
 import { EleveComposer, EleveThreadView } from "@/components/eleve/eleve-messages";
 import { KidShell } from "@/components/layout";
@@ -52,6 +53,18 @@ export default async function EleveMessagesPage({ searchParams }: PageProps<"/el
               </Card>
             ))
           )}
+          {home.nextCall ? (
+            <Card variant="brand" padding="lg" className="flex flex-col gap-1.5 rounded-20">
+              <p className="m-0 text-15 font-semibold text-white">Prochain appel vidéo</p>
+              <p className="m-0 text-20 font-extrabold">
+                {callLongDay(home.nextCall.startsAt, RELAIS_TIME_ZONE)}
+              </p>
+              <p className="m-0 text-15 text-white">
+                à {callHour(home.nextCall.startsAt, RELAIS_TIME_ZONE)}, chez {home.relaisName}, avec{" "}
+                {home.nextCall.parrainName}
+              </p>
+            </Card>
+          ) : null}
         </aside>
 
         <div className="flex min-w-0 flex-col gap-6">

@@ -98,25 +98,39 @@ test.describe("Espace parrain : Mes filleuls", () => {
     );
     await expect(message.getByRole("button", { name: "Envoyer un encouragement" })).toBeVisible();
 
+    // Appels vidéo : la demande en cours pour Aïcha (le 14, à confirmer par M. Koffi).
+    await expect(page.getByRole("link", { name: "Demander un appel vidéo" })).toHaveAttribute(
+      "href",
+      `/parrain/appels?filleul=${AICHA}`,
+    );
+    const call = page
+      .getByRole("region", { name: "Appel vidéo demandé" })
+      .filter({ visible: true });
+    await expect(call).toContainText("En attente de la confirmation de M. Koffi");
+    await expect(call.getByRole("link", { name: "Voir ma demande" })).toBeVisible();
+
     // Phases suivantes (drapeaux) : aucun lien mort.
-    for (const name of ["Demander un appel vidéo", "Télécharger mon reçu fiscal"]) {
+    for (const name of ["Télécharger mon reçu fiscal"]) {
       await expect(page.getByRole("link", { name })).toHaveCount(0);
       await expect(page.getByRole("button", { name })).toHaveCount(0);
     }
-    await expect(page.getByText("Prochain appel vidéo")).toHaveCount(0);
     await expect(page.getByText(/À quoi a servi votre don/)).toHaveCount(0);
 
-    // Ordre : profil, nouvelles, résultats, versements (empilés sous lg, aside à droite au-delà).
-    const [profileBox, feedBox, resultsBox, paymentsBox] = await Promise.all(
-      [profile, feed, results, payments].map(box),
+    // Ordre : profil, appel, nouvelles, résultats, versements (empilés sous lg) ; au-delà,
+    // l'aside à droite commence par l'appel, puis les résultats.
+    const [profileBox, callBox, feedBox, resultsBox, paymentsBox] = await Promise.all(
+      [profile, call, feed, results, payments].map(box),
     );
     if (test.info().project.name === "mobile-390") {
-      expect(profileBox.y).toBeLessThan(feedBox.y);
+      expect(profileBox.y).toBeLessThan(callBox.y);
+      expect(callBox.y).toBeLessThan(feedBox.y);
       expect(feedBox.y).toBeLessThan(resultsBox.y);
       expect(resultsBox.y).toBeLessThan(paymentsBox.y);
     } else {
       expect(resultsBox.x).toBeGreaterThan(profileBox.x + profileBox.width);
-      expect(resultsBox.y).toBeLessThan(feedBox.y);
+      expect(callBox.x).toBe(resultsBox.x);
+      expect(callBox.y).toBeLessThan(feedBox.y);
+      expect(callBox.y).toBeLessThan(resultsBox.y);
       expect(resultsBox.y).toBeLessThan(paymentsBox.y);
     }
   });
@@ -227,7 +241,7 @@ test.describe("Espace parrain : Mes filleuls", () => {
   test("les rubriques à venir ont une page d'attente", async ({ page }) => {
     await page.goto("/parrain");
     const nav = mainNav(page);
-    for (const name of ["Appels vidéo", "Mes versements"]) {
+    for (const name of ["Mes versements"]) {
       await nav.getByRole("link", { name }).click();
       await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
       await expect(page.getByText("Cette rubrique arrive bientôt")).toBeVisible();

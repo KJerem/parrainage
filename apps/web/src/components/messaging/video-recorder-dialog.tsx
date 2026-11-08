@@ -27,7 +27,7 @@ export function pickRecordingType(): string | null {
   return RECORDING_TYPES.find((type) => MediaRecorder.isTypeSupported(type)) ?? null;
 }
 
-function cameraErrorMessage(error: unknown): string {
+export function cameraErrorMessage(error: unknown): string {
   const name = error instanceof DOMException ? error.name : "";
   if (name === "NotAllowedError" || name === "SecurityError") {
     return "L'accès à la caméra a été refusé. Autorisez-le dans les réglages du navigateur, puis réessayez.";

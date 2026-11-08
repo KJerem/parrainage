@@ -7,6 +7,8 @@ export interface MailMessage {
   subject: string;
   html: string;
   text: string;
+  /** Seule pièce jointe permise : le fichier agenda (.ics) d'un appel vidéo. */
+  attachments?: { filename: string; content: string; contentType: "text/calendar" }[];
 }
 
 let transporter: Transporter | undefined;

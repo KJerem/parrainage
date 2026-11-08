@@ -15,6 +15,9 @@ function subHeaderOf(pathname: string): SubHeader | null {
       backLabel: "Retour aux conversations",
     };
   }
+  if (pathname.startsWith("/relais/appels/")) {
+    return { title: "Appel vidéo", backHref: "/relais/appels", backLabel: "Retour aux appels" };
+  }
   if (pathname === "/relais/messages") {
     return { title: "Messages", backHref: "/relais", backLabel: "Retour à l'accueil" };
   }
@@ -41,6 +44,7 @@ function subHeaderOf(pathname: string): SubHeader | null {
     "/relais/profil": "Profil",
     "/relais/notifications": "Notifications",
     "/relais/sessions": "Sessions élèves",
+    "/relais/appels": "Appels vidéo",
   };
   const title = titles[pathname];
   return title ? toHome(title) : null;

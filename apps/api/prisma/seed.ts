@@ -9,6 +9,7 @@ import { createS3Client } from "../src/storage/s3-client.js";
 import { buildSeedContent, type SeedContent, type SeedUpload } from "./seed/content.js";
 import { buildSeedData, type SeedUser } from "./seed/data.js";
 import { seedToday } from "./seed/dates.js";
+import { buildSeedCalls } from "./seed/calls.js";
 import { buildSeedSessions, seedChildCode } from "./seed/sessions.js";
 
 // Jour de référence : SEED_TODAY, sinon le jour de l'horloge figée APP_NOW, sinon aujourd'hui.
@@ -252,11 +253,51 @@ async function seedSessions(data: ReturnType<typeof buildSeedData>): Promise<voi
       data: childIds.map((childId) => ({ sessionId: id, childId })),
     });
   }
-  // Fils vers l'association créés par les tests (la démonstration n'en contient aucun).
+  // Conversations créées par les tests (fils vers l'association, demandes d'appel d'un parrain
+  // qui n'avait pas encore écrit à son relais…) : la démonstration n'en contient aucune autre.
   if (resetTests) {
-    await prisma.conversation.deleteMany({ where: { id: { startsWith: "child-assoc-" } } });
+    await prisma.conversation.deleteMany({ where: { NOT: { id: { startsWith: SEED_PREFIX } } } });
     await prisma.rateLimit.deleteMany({ where: { key: { startsWith: "messages:child:" } } });
   }
+}
+
+/**
+ * Créneaux, demandes et appels vidéo de M. Koffi. Ceux que les tests ont créés repartent
+ * (SEED_RESET_MESSAGES) ; les autres ajouts sont gardés.
+ */
+async function seedCalls(data: ReturnType<typeof buildSeedData>): Promise<void> {
+  const { slots, requests, calls, requestMessage } = buildSeedCalls(today, data);
+  const resetTests = process.env.SEED_RESET_MESSAGES === "1";
+  const scope = (ids: readonly string[]) => ({
+    OR: [
+      { id: { startsWith: SEED_PREFIX, notIn: [...ids] } },
+      ...(resetTests ? [{ NOT: { id: { startsWith: SEED_PREFIX } } }] : []),
+    ],
+  });
+  await prisma.videoCall.deleteMany({ where: scope(calls.map((c) => c.id)) });
+  await prisma.callRequest.deleteMany({ where: scope(requests.map((r) => r.id)) });
+  await prisma.callSlot.deleteMany({ where: scope(slots.map((s) => s.id)) });
+  // Ordre : créneaux libres, demandes, puis créneaux réservés pour elles, puis appels.
+  for (const { id, heldForId: _heldForId, ...fields } of slots) {
+    await prisma.callSlot.upsert({
+      where: { id },
+      update: { ...fields, heldForId: null },
+      create: { id, ...fields, heldForId: null },
+    });
+  }
+  for (const { id, ...fields } of requests) {
+    await prisma.callRequest.upsert({ where: { id }, update: fields, create: { id, ...fields } });
+  }
+  for (const { id, heldForId } of slots) {
+    await prisma.callSlot.update({ where: { id }, data: { heldForId } });
+  }
+  for (const { id, ...fields } of calls) {
+    await prisma.videoCall.upsert({ where: { id }, update: fields, create: { id, ...fields } });
+  }
+  await prisma.message.update({
+    where: { id: requestMessage.messageId },
+    data: { kind: "CALL_REQUEST", callRequestId: requestMessage.requestId },
+  });
 }
 
 async function main() {
@@ -302,6 +343,7 @@ async function main() {
   const content = buildSeedContent(today, data);
   const { uploaded } = await seedContent(content);
   await seedSessions(data);
+  await seedCalls(data);
 
   // Compteurs d'envoi de messages des comptes de démonstration remis à zéro (tests répétés).
   await prisma.rateLimit.deleteMany({ where: { key: { startsWith: "messages:seed-user-" } } });

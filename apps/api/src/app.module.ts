@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { AuthModule } from "@thallesp/nestjs-better-auth";
 import { AdminModule } from "./admin/admin.module.js";
+import { CallsModule } from "./calls/calls.module.js";
 import { auth } from "./auth/auth.js";
 import { validateEnv } from "./config/env.js";
 import { EleveModule } from "./eleve/eleve.module.js";
@@ -43,6 +44,7 @@ import { UploadsModule } from "./uploads/uploads.module.js";
     ModerationModule,
     RelaisModule,
     EleveModule,
+    CallsModule,
     SchedulerModule,
   ],
 })

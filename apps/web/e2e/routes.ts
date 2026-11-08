@@ -34,6 +34,8 @@ export const parrainRoutes: { path: string; title: string }[] = [
   { path: `/parrain/messages/${AICHA_CONVERSATION}`, title: "Conversation avec Aïcha" },
   { path: `/parrain/messages/${CLAIRE_KOFFI_CONVERSATION}`, title: "Conversation avec M. Koffi" },
   { path: "/parrain/appels", title: "Appels vidéo" },
+  { path: `/parrain/appels?filleul=${KOFI}`, title: "Appels vidéo (Kofi)" },
+  { path: "/parrain/appels/seed-video-call-kofi", title: "Salle d'appel (pas encore ouverte)" },
   { path: "/parrain/versements", title: "Mes versements" },
   { path: "/parrain/compte", title: "Mon compte" },
 ];
@@ -45,6 +47,8 @@ export const relaisRoutes: { path: string; title: string }[] = [
   { path: "/relais/messages?onglet=bureau", title: "Messages" },
   { path: `/relais/messages/${CLAIRE_KOFFI_CONVERSATION}`, title: "Conversation avec Claire M." },
   { path: "/relais/sessions", title: "Sessions élèves" },
+  { path: "/relais/appels", title: "Appels vidéo" },
+  { path: "/relais/appels/seed-video-call-kofi", title: "Salle d'appel" },
   { path: `/relais/messages/${AICHA_CONVERSATION}`, title: "Conversation d'un enfant" },
   { path: "/relais/profil", title: "Profil" },
   { path: "/relais/notifications", title: "Notifications" },

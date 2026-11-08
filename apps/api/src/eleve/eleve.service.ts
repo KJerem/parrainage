@@ -314,7 +314,7 @@ export class EleveService {
 
   async home(child: ChildContext): Promise<EleveHome> {
     const at = now();
-    const [sponsorships, association, news] = await Promise.all([
+    const [sponsorships, association, news, nextCall] = await Promise.all([
       this.prisma.sponsorship.findMany({
         where: {
           childId: child.childId,
@@ -341,6 +341,18 @@ export class EleveService {
         select: { id: true },
       }),
       this.news(child, at),
+      this.prisma.videoCall.findFirst({
+        where: {
+          status: "SCHEDULED",
+          startsAt: { gt: at },
+          sponsorship: { childId: child.childId, status: "ACTIVE" },
+        },
+        orderBy: { startsAt: "asc" },
+        select: {
+          startsAt: true,
+          sponsorship: { select: { parrain: { select: { firstName: true } } } },
+        },
+      }),
     ]);
     const rights = childRights(child.rights, child);
     const threads: EleveThread[] = sponsorships.flatMap(({ conversation, parrain }) =>
@@ -382,6 +394,12 @@ export class EleveService {
       rights,
       threads,
       news,
+      nextCall: nextCall
+        ? {
+            startsAt: nextCall.startsAt.toISOString(),
+            parrainName: nextCall.sponsorship.parrain.firstName,
+          }
+        : null,
     });
   }
 

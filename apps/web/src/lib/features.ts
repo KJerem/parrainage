@@ -8,7 +8,7 @@ export const features: Readonly<Record<Feature, boolean>> = {
   messaging: true,
   /** Phase 9 : carte « Prochain appel vidéo », « Demander un appel vidéo », « Proposer un appel
    * vidéo » et la réponse rapide aux demandes d'appel (RW-Messages). */
-  calls: false,
+  calls: true,
   /** Phase 10 : « Télécharger mon reçu fiscal ». */
   receipts: false,
   /** Phase 12 : « À quoi a servi votre don ». */

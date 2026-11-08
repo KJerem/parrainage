@@ -27,14 +27,24 @@ export async function waitForNewMessage(
   to: string,
   known: Set<string>,
   timeoutMs = 5000,
-): Promise<{ subject: string; text: string; html: string }> {
+): Promise<{ subject: string; text: string; html: string; attachments: string[] }> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const fresh = (await search(to)).find((m) => !known.has(m.ID));
     if (fresh) {
       const res = await fetch(`${MAILPIT_URL}/api/v1/message/${fresh.ID}`);
-      const message = (await res.json()) as { Subject: string; Text: string; HTML: string };
-      return { subject: message.Subject, text: message.Text, html: message.HTML };
+      const message = (await res.json()) as {
+        Subject: string;
+        Text: string;
+        HTML: string;
+        Attachments?: { FileName: string }[];
+      };
+      return {
+        subject: message.Subject,
+        text: message.Text,
+        html: message.HTML,
+        attachments: (message.Attachments ?? []).map((attachment) => attachment.FileName),
+      };
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }

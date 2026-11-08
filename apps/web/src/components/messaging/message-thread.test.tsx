@@ -51,6 +51,7 @@ const message = (id: string, createdAt: string, body: string, side: "me" | "them
     createdAt,
     status: side === "me" ? "lu" : null,
     moderationReason: null,
+    call: null,
   }) satisfies ConversationMessage;
 
 const page: MessagePage = {

@@ -109,6 +109,7 @@ describe("MessageItem", () => {
     createdAt: now,
     status: "en_relecture",
     moderationReason: null,
+    call: null,
     ...patch,
   });
 

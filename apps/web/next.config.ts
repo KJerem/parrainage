@@ -8,12 +8,14 @@ const mediaOrigin = new URL(process.env.S3_PUBLIC_ENDPOINT ?? "http://localhost:
 // lors du durcissement final.
 const contentSecurityPolicy = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://8x8.vc",
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: ${mediaOrigin}`,
   `media-src 'self' blob: ${mediaOrigin}`,
   "font-src 'self'",
   `connect-src 'self' ${mediaOrigin}`,
+  // Salle d'appel JaaS intégrée (VISIO_PROVIDER=jaas).
+  "frame-src https://8x8.vc",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

@@ -15,6 +15,7 @@ import {
 import { AppError } from "../common/app-error.js";
 import { now } from "../common/clock.js";
 import type { Prisma } from "../generated/prisma/client.js";
+import { loadNextCall } from "../calls/calls-common.js";
 import { listedMedia, mediaRefSelect, toMediaRef } from "../media/media-ref.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import {
@@ -99,7 +100,7 @@ export class ParrainService {
   async dashboard(userId: string, childId: string): Promise<FilleulDashboard> {
     const at = now();
     const sponsorship = await this.ownedSponsorship(userId, childId);
-    const [child, feed, results, payments] = await Promise.all([
+    const [child, feed, results, payments, nextCall] = await Promise.all([
       this.prisma.child.findUniqueOrThrow({
         where: { id: childId },
         select: {
@@ -134,6 +135,7 @@ export class ParrainService {
           periodKey: true,
         },
       }),
+      loadNextCall(this.prisma, sponsorship.id, at),
     ]);
     // Sans consentement médias, ou photo sans fichier affichable : les initiales.
     const photo =
@@ -168,6 +170,7 @@ export class ParrainService {
         payments,
         now: at,
       }),
+      nextCall,
     });
   }
 

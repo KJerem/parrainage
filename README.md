@@ -131,6 +131,20 @@ Un enfant n'a pas de compte : il se connecte pendant une session que son relais 
 
 Dans la démonstration, tous les enfants de M. Koffi ont un code image. Celui d'Aïcha est celui du design : Soleil, Arbre, Poisson. Pour essayer : connectez-vous avec `koffi@relais.exemple.tg`, ouvrez la session sur `/relais/sessions`, puis choisissez Aïcha.
 
+## Appels vidéo
+
+Le relais publie des créneaux (`/relais/appels`, heure de Lomé). Le parrain en demande un pour un filleul (`/parrain/appels`, P-Video), avec une durée de 15 ou 30 minutes et un mot facultatif.
+
+- **Réponse du relais** : depuis la conversation (« Réponse rapide » de RW-Messages) ou sa page Appels, il confirme le créneau ou en propose jusqu'à 3 autres. Le parrain choisit directement dans le message ou sur P-Video, et l'appel est confirmé aussitôt.
+- **Une demande à la fois** par binôme, et pas de nouvelle demande avant l'appel prévu. Les réponses sont atomiques : deux confirmations simultanées n'en donnent qu'une.
+- **E-mails** : un lien seulement. La confirmation joint le fichier agenda (`.ics`, sans nom d'enfant), aussi téléchargeable depuis l'application (`GET /api/calls/:id/ics`).
+- **Heures** : enregistrées en UTC, affichées à Paris et à Lomé (« 11 h Paris · 10 h Lomé »), en heure de Lomé côté enfant.
+- **Salle** : ouverte 10 minutes avant l'appel (`VISIO_JOIN_EARLY_MINUTES`) et jusqu'à 15 minutes après la fin prévue, pour le parrain du binôme et le relais seulement. Le parrain n'entre qu'après l'arrivée du relais : en attendant, il voit « En attente de M. Koffi ». Aucun enregistrement.
+- **`VISIO_PROVIDER=link`** (par défaut, et dans les tests) : la salle est une salle Jitsi publique au nom imprévisible, ouverte dans un nouvel onglet.
+- **`VISIO_PROVIDER=jaas`** : salle 8x8.vc intégrée à la page. Il faut un compte JaaS (https://jaas.8x8.vc), son App ID, l'identifiant et la clé privée de la clé API (`JAAS_APP_ID`, `JAAS_API_KEY_ID`, `JAAS_PRIVATE_KEY`). Le jeton RS256 est limité à la salle et à la fenêtre de l'appel, seul le relais est modérateur, et l'enregistrement, la diffusion, la transcription et les appels sortants sont coupés. Dans la salle, seuls micro, caméra, mosaïque et raccrocher restent. Si la salle ne s'affiche pas en 10 secondes, la page propose de l'ouvrir dans un onglet ou de réessayer.
+
+Dans la démonstration : créneaux des 14, 18 et 21 novembre, la demande de Claire pour Aïcha (le 14, à confirmer par M. Koffi), l'appel confirmé avec Kofi le 5 novembre, et deux appels passés.
+
 ## Modération
 
 Le bureau relit chaque message échangé avec un enfant, sur `/bureau` (file et approbation sur place) et `/bureau/moderation` (file et message relu).

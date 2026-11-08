@@ -10,6 +10,7 @@ import {
   type MessagePreview,
 } from "@parrainage/contracts";
 import type { Actor } from "../auth/actor.js";
+import { callCardSelect, toCallCard } from "../calls/calls-common.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import type { Gender } from "../generated/prisma/enums.js";
 import { listedMedia, toMediaRef } from "../media/media-ref.js";
@@ -76,6 +77,7 @@ export const messageSelect = {
   },
   authorChild: { select: { firstName: true, lastInitial: true, avatarTone: true } },
   media: listedMedia,
+  callRequest: { select: callCardSelect },
 } as const satisfies Prisma.MessageSelect;
 
 export type MessageRow = Prisma.MessageGetPayload<{ select: typeof messageSelect }>;
@@ -253,6 +255,7 @@ export function toConversationMessage(
     createdAt: row.createdAt.toISOString(),
     status: mine || access === "supervisor" ? messageStatus(row) : null,
     moderationReason: mine && reviewed ? row.moderationReason : null,
+    call: row.callRequest ? toCallCard(row.callRequest) : null,
   };
 }
 

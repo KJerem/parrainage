@@ -2,6 +2,7 @@
 // textes visibles dépendent de l'acteur : un message en relecture n'est montré qu'à son auteur.
 import { z } from "zod";
 import { avatarToneSchema } from "./avatar.js";
+import { callCardSchema } from "./calls.js";
 import { mediaRefSchema } from "./media.js";
 import type { Role } from "./roles.js";
 
@@ -188,6 +189,8 @@ export const conversationMessageSchema = z.object({
   status: messageStatusSchema.nullable(),
   /** Motif de l'association pour un message retenu ou masqué, montré à son auteur seulement. */
   moderationReason: z.string().nullable(),
+  /** Demande d'appel dont parle le message (demande, créneaux proposés, confirmation). */
+  call: callCardSchema.nullable(),
 });
 
 export type ConversationMessage = z.infer<typeof conversationMessageSchema>;
