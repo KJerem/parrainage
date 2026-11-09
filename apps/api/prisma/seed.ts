@@ -332,8 +332,36 @@ async function seedCalls(data: ReturnType<typeof buildSeedData>): Promise<void> 
   });
 }
 
+/**
+ * Binômes créés par les tests (B-Binomes) et parrains qu'ils ont invités (adresses en
+ * « @e2e.exemple.fr ») : retirés pour les suites de tests (SEED_RESET_MESSAGES), qui repartent
+ * des enfants en attente de la démonstration.
+ */
+async function removeTestPairings(): Promise<void> {
+  const sponsorshipIds = (
+    await prisma.sponsorship.findMany({
+      where: { NOT: { id: { startsWith: SEED_PREFIX } } },
+      select: { id: true },
+    })
+  ).map((s) => s.id);
+  if (sponsorshipIds.length > 0) {
+    const scope = { sponsorshipId: { in: sponsorshipIds } };
+    await prisma.conversation.deleteMany({ where: scope });
+    await prisma.videoCall.deleteMany({ where: scope });
+    await prisma.callRequest.deleteMany({ where: scope });
+    await prisma.payment.deleteMany({ where: scope });
+    await prisma.sponsorship.deleteMany({ where: { id: { in: sponsorshipIds } } });
+  }
+  const invited = { email: { endsWith: "@e2e.exemple.fr" } };
+  await prisma.parrainProfile.deleteMany({ where: { user: invited } });
+  await prisma.user.deleteMany({ where: invited });
+}
+
 async function main() {
   const data = buildSeedData(today);
+  if (process.env.SEED_RESET_MESSAGES === "1") {
+    await removeTestPairings();
+  }
 
   await upsertUser(data.bureau);
 

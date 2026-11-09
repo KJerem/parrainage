@@ -170,6 +170,16 @@ Le bureau relit chaque message échangé avec un enfant, sur `/bureau` (file et 
 - **E-mails** : un lien, jamais une ligne du message. Le parrain d'un enfant est prévenu d'un message remis, sauf s'il a déjà des non-lus dans cette conversation. Message retenu ou masqué : l'auteur adulte reçoit le motif et la règle de la charte ; pour un message d'enfant, c'est son relais qui est prévenu. Un enfant ne reçoit jamais d'e-mail.
 - **Signalements** : le bureau pose ou retire un signalement manuel (`POST /api/moderation/messages/:id/flag`). Le relais signale un message de ses enfants depuis leur conversation (`POST /api/relais/messages/:id/flag`).
 
+## Bureau : binômes, parrains et dossiers
+
+- **Vue d'ensemble** (`/bureau`) : binômes actifs (pays des parrains, relais), messages à relire, enfants parrainés sans nouvelle depuis 60 jours, collecté du mois et versements en retard, puis les **binômes à surveiller** : parrains inactifs d'abord, puis les plus longs silences, avec toujours une place pour les enfants à parrainer.
+- **Santé d'un binôme**, calculée à chaque lecture : *parrain inactif* (aucune connexion depuis 60 jours ou au moins 2 versements en retard), sinon *à relancer* (60 jours sans nouvelle de l'enfant ni message remis dans le binôme), sinon *actif*. La dernière connexion d'un parrain est enregistrée à chaque ouverture de session.
+- **B-Binomes** (`/bureau/binomes`) : l'enfant en attente (`?enfant=`, dossiers envoyés d'abord), la recherche d'un parrain (nom, ville, e-mail ; jamais un parrain inactif), la mensualité et la date de début, puis « Créer et prévenir parrain et relais ». La création verrouille l'enfant (deux créations simultanées : une seule passe), valide son dossier s'il était seulement envoyé, ouvre la conversation du binôme et prévient le parrain et le relais par un lien. Tous les binômes se filtrent par relais et par état (`?relais=`, `?etat=actif|a-relancer|parrain-inactif`).
+- **Parrains** (`/bureau/parrains`) : recherche, état (marraine ou parrain, en attente d'un filleul, inactif, invité) et invitation. L'invitation crée le compte et envoie un lien de connexion de 10 minutes ; passé ce délai, la personne en demande un autre depuis la page de connexion.
+- **Dossier d'un enfant** (`/bureau/enfants/:id`, lien de l'e-mail « dossier à vérifier ») : identité, responsable légal, consentements, binôme ; « Valider le dossier » prévient le relais. Un brouillon reste invisible au bureau.
+
+Toutes ces actions sont auditées (`child.validate`, `sponsorship.create`, `user.invite`).
+
 ## Tests de bout en bout du web
 
 `npm run test:e2e -w @parrainage/web` construit puis lance l'API (port 4100) et le web (port 3100), à côté d'un éventuel `npm run dev` (3000 et 4000). Les services Docker doivent tourner (PostgreSQL et Mailpit).

@@ -2,19 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { ComingSoon } from "@/components/layout/coming-soon";
-import { BellIcon, ShieldIcon, UserIcon, UsersIcon, WalletIcon } from "@/components/ui";
+import { BellIcon, ShieldIcon, UserIcon, WalletIcon } from "@/components/ui";
 import { requireRole } from "@/lib/auth.server";
 
 /** Rubriques de la navigation du bureau qui ne sont pas encore livrées. */
 const rubriques = new Map<string, { title: string; description: string; icon: ReactNode }>([
-  [
-    "binomes",
-    {
-      title: "Binômes",
-      description: "Vous pourrez bientôt créer les binômes et suivre ceux qui demandent attention.",
-      icon: <UsersIcon size={26} />,
-    },
-  ],
   [
     "reseau",
     {
@@ -22,14 +14,6 @@ const rubriques = new Map<string, { title: string; description: string; icon: Re
       description:
         "Les relais, les fonds reversés et les justificatifs à valider s'afficheront bientôt ici.",
       icon: <WalletIcon size={26} />,
-    },
-  ],
-  [
-    "parrains",
-    {
-      title: "Parrains",
-      description: "Vous pourrez bientôt consulter les parrains et inviter de nouvelles personnes.",
-      icon: <UsersIcon size={26} />,
     },
   ],
   [

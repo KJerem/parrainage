@@ -24,6 +24,8 @@ export const monthlyPaymentMethodSchema = z.enum(monthlyPaymentMethods);
 
 export type MonthlyPaymentMethod = z.infer<typeof monthlyPaymentMethodSchema>;
 
+/** Mensualité proposée pour un nouveau binôme. */
+export const DEFAULT_MONTHLY_AMOUNT_CENTS = 2500;
 export const MONTHLY_AMOUNT_MIN_CENTS = 1000;
 export const MONTHLY_AMOUNT_MAX_CENTS = 50000;
 export const monthlyAmountPresetsCents = [2500, 3000, 5000] as const;

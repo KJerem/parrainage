@@ -268,7 +268,7 @@ test("un message inconnu ouvre la page introuvable du bureau", async ({ page }) 
 });
 
 test("les rubriques à venir répondent sans 404, les autres non", async ({ page }) => {
-  for (const path of ["/bureau/binomes", "/bureau/reseau", "/bureau/parrains"]) {
+  for (const path of ["/bureau/reseau", "/bureau/parametres"]) {
     const response = await page.goto(path);
     expect(response?.status(), path).toBe(200);
     await expect(page.getByText("Cette rubrique arrive bientôt")).toBeVisible();

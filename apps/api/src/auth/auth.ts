@@ -2,7 +2,8 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { admin, magicLink } from "better-auth/plugins";
 import { getEnv } from "../config/env.js";
-import { magicLinkEmail, resetPasswordEmail } from "../mail/templates.js";
+import { now } from "../common/clock.js";
+import { magicLinkEmail, parrainInvitationEmail, resetPasswordEmail } from "../mail/templates.js";
 import { sendMailInBackground } from "../mail/transport.js";
 import { prisma } from "../prisma/client.js";
 import { emailRateLimit } from "./email-rate-limit.js";
@@ -12,6 +13,9 @@ const env = getEnv();
 
 /** Chemin des routes Better Auth, servies par l'API derrière la réécriture /api/* du web. */
 export const AUTH_BASE_PATH = "/api/auth";
+
+/** Clé des métadonnées d'un lien de connexion envoyé comme invitation. */
+export const INVITATION_METADATA = "invitation";
 
 export const auth = betterAuth({
   appName: "Parrainage LRT",
@@ -56,6 +60,19 @@ export const auth = betterAuth({
   hooks: {
     before: emailRateLimit,
   },
+  databaseHooks: {
+    session: {
+      create: {
+        // Activité d'un parrain (« parrain inactif » au-delà de 60 jours) : chaque connexion.
+        after: async (session) => {
+          await prisma.parrainProfile.updateMany({
+            where: { userId: session.userId },
+            data: { lastActiveAt: now() },
+          });
+        },
+      },
+    },
+  },
   advanced: {
     ipAddress: { ipAddressHeaders: ["x-forwarded-for"] },
     // Better Auth saute le contrôle d'Origin quand NODE_ENV=test : on le garde actif partout
@@ -73,7 +90,7 @@ export const auth = betterAuth({
       disableSignUp: true,
       expiresIn: 600,
       storeToken: "hashed",
-      sendMagicLink: async ({ email, url }) => {
+      sendMagicLink: async ({ email, url, metadata }) => {
         // Adresse inconnue ou compte suspendu : aucun e-mail, mais la même réponse dans le même
         // délai, l'envoi n'étant pas attendu (pas d'énumération).
         const user = await prisma.user.findUnique({
@@ -85,7 +102,12 @@ export const auth = betterAuth({
         if (!user || suspended) {
           return;
         }
-        sendMailInBackground({ to: email, ...magicLinkEmail(url) });
+        // Invitation envoyée par le bureau (appel serveur, voir ParrainsService.invite).
+        const invitation = metadata?.[INVITATION_METADATA] === true;
+        sendMailInBackground({
+          to: email,
+          ...(invitation ? parrainInvitationEmail(url) : magicLinkEmail(url)),
+        });
       },
     }),
   ],

@@ -354,6 +354,7 @@ describe("Espace relais (e2e)", () => {
 
       const mail = await waitForNewMessage(ACCOUNTS.bureau, known);
       expect(mail.subject).toBe("Un dossier d'enfant à vérifier");
+      expect(mail.text).toContain(`/bureau/enfants/${child.id}`);
       expect(`${mail.text}${mail.html}`).not.toContain("Secretine");
 
       const consents = await prisma.consentRecord.findMany({ where: { childId: child.id } });

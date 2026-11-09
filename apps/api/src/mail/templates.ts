@@ -176,9 +176,57 @@ export function childSubmittedEmail(url: string): MailContent {
   return linkEmail({
     subject: "Un dossier d'enfant à vérifier",
     intro: "Un relais vient d'envoyer le dossier d'un enfant au bureau.",
-    action: "Ouvrir mon espace",
+    action: "Vérifier le dossier",
     url,
     notes: ["Vérifiez le dossier avant de proposer un parrain."],
+  });
+}
+
+/** Au relais : le bureau a validé le dossier d'un de ses enfants. */
+export function childValidatedEmail(url: string): MailContent {
+  return linkEmail({
+    subject: "Dossier validé par le bureau",
+    intro: "Le bureau a validé le dossier d'un enfant que vous suivez.",
+    action: "Voir le dossier",
+    url,
+    notes: ["L'enfant peut maintenant recevoir un parrain."],
+  });
+}
+
+/** Au parrain : l'association lui présente un enfant. */
+export function sponsorshipCreatedParrainEmail(url: string): MailContent {
+  return linkEmail({
+    subject: "Un enfant vous a été présenté",
+    intro:
+      "L'association vous a présenté l'enfant que vous allez parrainer. Découvrez son profil dans votre espace.",
+    action: "Découvrir mon filleul",
+    url,
+    notes: ["Vos premiers messages seront relus par l'association avant de lui être remis."],
+  });
+}
+
+/** Au relais : un parrain a été trouvé pour un de ses enfants. */
+export function sponsorshipCreatedRelaisEmail(url: string): MailContent {
+  return linkEmail({
+    subject: "Un parrain pour un de vos enfants",
+    intro: "Le bureau a trouvé un parrain pour un enfant que vous suivez.",
+    action: "Voir l'enfant",
+    url,
+    notes: ["Pensez à publier une première nouvelle pour le présenter à son parrain."],
+  });
+}
+
+/** Invitation d'un parrain : un lien de connexion, valable 10 minutes. */
+export function parrainInvitationEmail(url: string): MailContent {
+  return linkEmail({
+    subject: "Invitation à la plateforme de parrainage LRT",
+    intro:
+      "L'association LRT vous invite à rejoindre sa plateforme de parrainage : vous y suivrez votre filleul, ses nouvelles et vos versements.",
+    action: "Accéder à mon espace",
+    url,
+    notes: [
+      "Ce lien est valable 10 minutes. Ensuite, demandez un nouveau lien sur la page de connexion avec cette adresse.",
+    ],
   });
 }
 

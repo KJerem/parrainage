@@ -70,5 +70,9 @@ export const bureauRoutes: { path: string; title: string }[] = [
   { path: "/bureau/moderation/seed-message-attente-paul", title: "Message avec alerte" },
   { path: "/bureau/moderation/seed-message-attente-mariam", title: "Message avec vidéo" },
   { path: "/bureau/moderation/seed-message-attente-aicha", title: "Message avec bulletin" },
-  { path: "/bureau/binomes", title: "Rubrique à venir" },
+  { path: "/bureau/binomes", title: "Binômes" },
+  { path: "/bureau/binomes?etat=a-relancer", title: "Binômes à relancer" },
+  { path: "/bureau/parrains", title: "Parrains" },
+  { path: "/bureau/enfants/seed-child-esther", title: "Dossier d'Esther" },
+  { path: "/bureau/reseau", title: "Rubrique à venir" },
 ];

@@ -301,7 +301,7 @@ export class ChildrenService {
       return tx.child.findUniqueOrThrow({ where: { id }, select: detailSelect });
     });
     if (submitting) {
-      await this.notifyBureau();
+      await this.notifyBureau(row.id);
     }
     return { child: toDetail(row, at), code };
   }
@@ -371,7 +371,7 @@ export class ChildrenService {
     });
     await removeStoredFiles(this.prisma, this.storage, this.logger, dropped);
     if (submitting) {
-      await this.notifyBureau();
+      await this.notifyBureau(row.id);
     }
     return { child: toDetail(row, at), code };
   }
@@ -606,13 +606,13 @@ export class ChildrenService {
     });
   }
 
-  /** Le bureau vérifie les dossiers envoyés : un lien, aucune donnée de l'enfant. */
-  private async notifyBureau(): Promise<void> {
+  /** Le bureau vérifie les dossiers envoyés : un lien vers le dossier, aucune donnée de l'enfant. */
+  private async notifyBureau(childId: string): Promise<void> {
     const users = await this.prisma.user.findMany({
       where: { role: "bureau", OR: [{ banned: null }, { banned: false }] },
       select: { email: true },
     });
-    const url = new URL("/bureau", this.appUrl).toString();
+    const url = new URL(`/bureau/enfants/${encodeURIComponent(childId)}`, this.appUrl).toString();
     for (const user of users) {
       sendMailInBackground({ to: user.email, ...childSubmittedEmail(url) });
     }

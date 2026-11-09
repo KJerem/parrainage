@@ -12,6 +12,7 @@ export const ACCOUNTS = {
   paul: "paul.d@exemple.fr",
   helene: "helene.r@exemple.fr",
   marc: "marc.p@exemple.fr",
+  sophie: "sophie.l@exemple.fr",
   koffi: "koffi@relais.exemple.tg",
   diallo: "diallo@relais.exemple.tg",
   bureau: "bureau@exemple.fr",
