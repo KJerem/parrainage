@@ -3,6 +3,7 @@ import {
   magicLinkEmail,
   messageHeldEmail,
   messageMaskedEmail,
+  monthlyAmountChangedEmail,
   newMessageEmail,
   newsPublishedBureauEmail,
   newsPublishedEmail,
@@ -23,6 +24,14 @@ describe("modèles d'e-mail", () => {
     // L'esperluette du lien est échappée dans l'attribut href.
     expect(mail.html).toContain(url.replaceAll("&", "&amp;"));
     expect(mail.html).not.toContain(`href="${url}"`);
+  });
+
+  it("mensualité modifiée : ni montant ni filleul, seulement le lien", () => {
+    const link = "http://localhost:3000/parrain/versements";
+    const mail = monthlyAmountChangedEmail(link);
+    expect(mail.subject).toBe("Votre mensualité a été modifiée");
+    expect(mail.text).toContain(link);
+    expect(mail.text).not.toMatch(/€|\d+ ?euros?/);
   });
 
   it("nouveau message : notification et lien seulement", () => {

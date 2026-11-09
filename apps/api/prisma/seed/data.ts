@@ -19,6 +19,8 @@ export interface SeedParrain extends SeedUser {
     id: string;
     firstName: string;
     lastInitial: string;
+    /** Nom complet, imprimé seulement sur les reçus fiscaux. */
+    lastName: string;
     displayName: string;
     gender: Gender;
     city: string;
@@ -29,6 +31,7 @@ export interface SeedParrain extends SeedUser {
     wishes: string | null;
     avatarTone: AvatarTone;
     debitDay: number;
+    paymentMethod: "SEPA_DEBIT" | "CARD";
     joinedAt: Date;
     lastActiveAt: Date;
   };
@@ -96,6 +99,23 @@ export interface SeedData {
 
 /** Mensualité par défaut d'un binôme : 25 €. */
 export const DEFAULT_MONTHLY_CENTS = 2500;
+
+/** Nom de famille des parrains générés, d'après leur initiale (reçus fiscaux). */
+const SURNAMES: Readonly<Record<string, string>> = {
+  B: "Bernard",
+  C: "Chevalier",
+  D: "Dupont",
+  F: "Fontaine",
+  G: "Girard",
+  H: "Henry",
+  L: "Lambert",
+  M: "Moreau",
+  N: "Noël",
+  P: "Perrin",
+  R: "Roux",
+  S: "Simon",
+  T: "Thomas",
+};
 
 /** Numéro masqué : aucun vrai numéro dans le seed. */
 const FICTITIOUS_PHONE = "+228 ·· ·· ·· ··";
@@ -247,6 +267,8 @@ export function buildSeedData(today: Date): SeedData {
     spec: {
       firstName: string;
       lastInitial: string;
+      /** Par défaut, un nom courant qui commence par l'initiale. */
+      lastName?: string;
       gender: Gender;
       city: string;
       country?: string;
@@ -269,6 +291,7 @@ export function buildSeedData(today: Date): SeedData {
         id: parrainId(slug),
         firstName: spec.firstName,
         lastInitial: spec.lastInitial,
+        lastName: spec.lastName ?? SURNAMES[spec.lastInitial] ?? `${spec.lastInitial}.`,
         displayName,
         gender: spec.gender,
         city: spec.city,
@@ -279,6 +302,7 @@ export function buildSeedData(today: Date): SeedData {
         wishes: spec.wishes ?? null,
         avatarTone: spec.avatarTone,
         debitDay: 5,
+        paymentMethod: "SEPA_DEBIT",
         joinedAt: spec.joinedAt,
         lastActiveAt: spec.lastActiveAt,
       },
@@ -290,6 +314,7 @@ export function buildSeedData(today: Date): SeedData {
   const claire = addParrain("claire", "claire.m@exemple.fr", {
     firstName: "Claire",
     lastInitial: "M",
+    lastName: "Martin",
     gender: "F",
     city: "Lyon",
     addressLine: "12 rue des Tilleuls",
@@ -301,6 +326,7 @@ export function buildSeedData(today: Date): SeedData {
   const paul = addParrain("paul", "paul.d@exemple.fr", {
     firstName: "Paul",
     lastInitial: "D",
+    lastName: "Durand",
     gender: "M",
     city: "Bordeaux",
     avatarTone: "neutral",
@@ -310,6 +336,7 @@ export function buildSeedData(today: Date): SeedData {
   const helene = addParrain("helene", "helene.r@exemple.fr", {
     firstName: "Hélène",
     lastInitial: "R",
+    lastName: "Robert",
     gender: "F",
     city: "Toulouse",
     avatarTone: "neutral",
@@ -319,6 +346,7 @@ export function buildSeedData(today: Date): SeedData {
   const marc = addParrain("marc", "marc.p@exemple.fr", {
     firstName: "Marc",
     lastInitial: "P",
+    lastName: "Petit",
     gender: "M",
     city: "Paris",
     avatarTone: "neutral",
@@ -328,6 +356,7 @@ export function buildSeedData(today: Date): SeedData {
   addParrain("sophie", "sophie.l@exemple.fr", {
     firstName: "Sophie",
     lastInitial: "L",
+    lastName: "Laurent",
     gender: "F",
     city: "Nantes",
     wishes: "Souhaite parrainer une fille en primaire",
@@ -339,6 +368,7 @@ export function buildSeedData(today: Date): SeedData {
   const sophie2 = addParrain("sophie2", "sophie.l2@exemple.fr", {
     firstName: "Sophie",
     lastInitial: "L",
+    lastName: "Lefebvre",
     gender: "F",
     city: "Lille",
     avatarTone: "neutral",

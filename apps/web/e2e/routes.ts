@@ -37,6 +37,7 @@ export const parrainRoutes: { path: string; title: string }[] = [
   { path: `/parrain/appels?filleul=${KOFI}`, title: "Appels vidéo (Kofi)" },
   { path: "/parrain/appels/seed-video-call-kofi", title: "Salle d'appel (pas encore ouverte)" },
   { path: "/parrain/versements", title: "Mes versements" },
+  { path: "/parrain/versements?annee=2025", title: "Mes versements (2025)" },
   { path: "/parrain/compte", title: "Mon compte" },
 ];
 

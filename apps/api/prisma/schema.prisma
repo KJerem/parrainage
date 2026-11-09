@@ -53,6 +53,7 @@ model User {
   classSessions    ClassSession[]            @relation("ClassSessionCreatedBy")
   callSlots        CallSlot[]                @relation("CallSlotCreatedBy")
   callRequests     CallRequest[]             @relation("CallRequestCreatedBy")
+  amountChanges    MonthlyAmountChange[]     @relation("MonthlyAmountChangedBy")
 
   @@unique([email])
   @@map("user")
@@ -180,32 +181,37 @@ model School {
 
 /// Profil d'un parrain ou d'une marraine (un compte de rôle « parrain »).
 model ParrainProfile {
-  id           String    @id @default(cuid())
-  userId       String    @unique
-  user         User      @relation(fields: [userId], references: [id], onDelete: Restrict)
-  firstName    String
+  id            String        @id @default(cuid())
+  userId        String        @unique
+  user          User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  firstName     String
   /// Initiale du nom, sans point (« M » pour « Claire M. »).
-  lastInitial  String
-  displayName  String
-  gender       Gender
-  city         String
-  country      String    @default("France")
-  timeZone     String    @default("Europe/Paris")
+  lastInitial   String
+  /// Nom complet, imprimé seulement sur le reçu fiscal (l'interface s'en tient à l'initiale).
+  lastName      String?
+  displayName   String
+  gender        Gender
+  city          String
+  country       String        @default("France")
+  timeZone      String        @default("Europe/Paris")
   /// Adresse postale, pour le reçu fiscal.
-  addressLine  String?
-  postalCode   String?
-  wishes       String?
-  avatarTone   String    @default("info")
+  addressLine   String?
+  postalCode    String?
+  wishes        String?
+  avatarTone    String        @default("info")
   /// Jour du prélèvement mensuel simulé (1 à 28).
-  debitDay     Int       @default(5)
-  joinedAt     DateTime  @default(now())
-  lastActiveAt DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  debitDay      Int           @default(5)
+  /// Moyen de paiement simulé des mensualités : prélèvement ou carte (aucune coordonnée gardée).
+  paymentMethod PaymentMethod @default(SEPA_DEBIT)
+  joinedAt      DateTime      @default(now())
+  lastActiveAt  DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   sponsorships  Sponsorship[]
   conversations Conversation[]
   payments      Payment[]
+  receipts      FiscalReceipt[]
 }
 
 model Child {
@@ -311,10 +317,11 @@ model Sponsorship {
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
-  conversation Conversation?
-  payments     Payment[]
-  callRequests CallRequest[]
-  videoCalls   VideoCall[]
+  conversation  Conversation?
+  payments      Payment[]
+  callRequests  CallRequest[]
+  videoCalls    VideoCall[]
+  amountChanges MonthlyAmountChange[]
 
   @@index([childId, status])
   @@index([parrainId, status])
@@ -814,29 +821,71 @@ enum PaymentStatus {
 /// Versement simulé. `periodKey` (AAAA-MM) n'est renseigné que pour une mensualité : un seul
 /// prélèvement par binôme et par mois ; les dons ponctuels (NULL) restent libres.
 model Payment {
-  id            String         @id @default(cuid())
-  parrainId     String
-  parrain       ParrainProfile @relation(fields: [parrainId], references: [id], onDelete: Restrict)
-  sponsorshipId String?
-  sponsorship   Sponsorship?   @relation(fields: [sponsorshipId], references: [id], onDelete: Restrict)
-  childId       String?
-  child         Child?         @relation(fields: [childId], references: [id], onDelete: Restrict)
-  kind          PaymentKind
-  amountCents   Int
-  method        PaymentMethod
-  label         String?
-  dueDate       DateTime       @db.Date
-  paidAt        DateTime?
-  status        PaymentStatus  @default(SCHEDULED)
-  reference     String         @unique
-  periodKey     String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id             String         @id @default(cuid())
+  parrainId      String
+  parrain        ParrainProfile @relation(fields: [parrainId], references: [id], onDelete: Restrict)
+  sponsorshipId  String?
+  sponsorship    Sponsorship?   @relation(fields: [sponsorshipId], references: [id], onDelete: Restrict)
+  childId        String?
+  child          Child?         @relation(fields: [childId], references: [id], onDelete: Restrict)
+  kind           PaymentKind
+  amountCents    Int
+  method         PaymentMethod
+  label          String?
+  dueDate        DateTime       @db.Date
+  paidAt         DateTime?
+  status         PaymentStatus  @default(SCHEDULED)
+  reference      String         @unique
+  periodKey      String?
+  /// Don ponctuel : « parrainId:clé » ; rejouer la même clé renvoie le même don.
+  idempotencyKey String?        @unique
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   @@unique([sponsorshipId, periodKey])
   @@index([parrainId, dueDate])
   @@index([childId, dueDate])
   @@index([status, dueDate])
+}
+
+/// Changement de mensualité d'un binôme, à partir du mois `effectivePeriodKey` (AAAA-MM).
+model MonthlyAmountChange {
+  id                 String      @id @default(cuid())
+  sponsorshipId      String
+  sponsorship        Sponsorship @relation(fields: [sponsorshipId], references: [id], onDelete: Cascade)
+  changedById        String
+  changedBy          User        @relation("MonthlyAmountChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+  fromCents          Int
+  toCents            Int
+  effectivePeriodKey String
+  createdAt          DateTime    @default(now())
+
+  @@index([sponsorshipId, createdAt])
+}
+
+/// Reçu fiscal annuel d'un parrain (article 200 du CGI). Numéro, montant et identité du donateur
+/// sont figés à l'émission : le même PDF se retélécharge à l'identique.
+model FiscalReceipt {
+  id           String          @id @default(cuid())
+  parrainId    String
+  parrain      ParrainProfile  @relation(fields: [parrainId], references: [id], onDelete: Restrict)
+  year         Int
+  /// Rang dans l'année, attribué en transaction : « 2025-00012 ».
+  sequence     Int
+  number       String          @unique
+  amountCents  Int
+  /// Nombre de versements reçus dans l'année (reçu récapitulatif).
+  paymentCount Int
+  /// Moyens de paiement des versements de l'année.
+  methods      PaymentMethod[]
+  donorName    String
+  /// Adresse sur plusieurs lignes, séparées par « \n ».
+  donorAddress String?
+  issuedAt     DateTime
+  createdAt    DateTime        @default(now())
+
+  @@unique([parrainId, year])
+  @@unique([year, sequence])
 }
 
 // ─── Transverse ───────────────────────────────────────────────────────────────

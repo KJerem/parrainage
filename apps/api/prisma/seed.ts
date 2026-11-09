@@ -7,9 +7,10 @@ import { prisma } from "../src/prisma/client.js";
 import { hashChildCode } from "../src/relais/child-code.js";
 import { createS3Client } from "../src/storage/s3-client.js";
 import { buildSeedContent, type SeedContent, type SeedUpload } from "./seed/content.js";
-import { buildSeedData, type SeedUser } from "./seed/data.js";
+import { buildSeedData, type SeedData, type SeedUser } from "./seed/data.js";
 import { seedToday } from "./seed/dates.js";
 import { buildSeedCalls } from "./seed/calls.js";
+import { buildSeedReceipts } from "./seed/receipts.js";
 import { buildSeedSessions, seedChildCode } from "./seed/sessions.js";
 
 // Jour de référence : SEED_TODAY, sinon le jour de l'horloge figée APP_NOW, sinon aujourd'hui.
@@ -157,6 +158,23 @@ async function seedContent(content: SeedContent): Promise<{ uploaded: number }> 
   await prisma.message.deleteMany({ where: stale(content.messages.map((m) => m.id)) });
   await prisma.newsPost.deleteMany({ where: stale(content.news.map((n) => n.id)) });
   await prisma.payment.deleteMany({ where: stale(content.payments.map((p) => p.id)) });
+  // Mensualités de la banque simulée (npm run simulate:payments) : le seed les recrée. Dons des
+  // tests (clé « e2e-… ») ; pour les suites de tests, tous les versements ajoutés à la main.
+  await prisma.payment.deleteMany({
+    where: {
+      NOT: { id: { startsWith: SEED_PREFIX } },
+      OR: [
+        { kind: "MONTHLY", sponsorshipId: { startsWith: SEED_PREFIX } },
+        { idempotencyKey: { contains: ":e2e-" } },
+        ...(resetDemoConversations ? [{ parrainId: { startsWith: SEED_PREFIX } }] : []),
+      ],
+    },
+  });
+  if (resetDemoConversations) {
+    await prisma.monthlyAmountChange.deleteMany({
+      where: { sponsorshipId: { startsWith: SEED_PREFIX } },
+    });
+  }
   await prisma.schoolResult.deleteMany({ where: stale(content.results.map((r) => r.id)) });
   await prisma.academicPeriod.deleteMany({
     where: { ...stale(content.periods.map((p) => p.id)), results: { none: {} } },
@@ -212,6 +230,20 @@ async function seedContent(content: SeedContent): Promise<{ uploaded: number }> 
     prisma.payment.upsert({ where: { id }, update: fields, create: { id, ...fields } }),
   );
   return { uploaded: uploaded.size };
+}
+
+/**
+ * Reçus fiscaux des années closes, recréés à chaque seed (mêmes numéros). Les reçus émis depuis
+ * l'application pour ces années sont retirés : leur rang pourrait croiser celui du seed.
+ */
+async function seedReceipts(data: SeedData, content: SeedContent): Promise<number> {
+  const receipts = buildSeedReceipts(today, data.parrains, content.payments);
+  const years = [...new Set(receipts.map((r) => r.year))];
+  await prisma.fiscalReceipt.deleteMany({
+    where: { OR: [{ id: { startsWith: SEED_PREFIX } }, { year: { in: years } }] },
+  });
+  await prisma.fiscalReceipt.createMany({ data: receipts });
+  return receipts.length;
 }
 
 /**
@@ -342,6 +374,7 @@ async function main() {
 
   const content = buildSeedContent(today, data);
   const { uploaded } = await seedContent(content);
+  const receiptCount = await seedReceipts(data, content);
   await seedSessions(data);
   await seedCalls(data);
 
@@ -378,7 +411,8 @@ async function main() {
       `${content.conversations.length} conversations ` +
       `(${content.conversations.filter((c) => c.kind !== "SPONSORSHIP").length} entre adultes), ` +
       `${content.results.length} résultats, ` +
-      `${content.payments.length} versements, ${content.media.length} médias ` +
+      `${content.payments.length} versements, ${receiptCount} reçus fiscaux, ` +
+      `${content.media.length} médias ` +
       `(${uploaded} fichier${uploaded > 1 ? "s" : ""} déposé${uploaded > 1 ? "s" : ""})`,
   );
 }

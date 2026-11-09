@@ -58,6 +58,16 @@ export const envSchema = z
     JAAS_PRIVATE_KEY: z.string().default(""),
     /** La salle ouvre ce nombre de minutes avant l'appel. */
     VISIO_JOIN_EARLY_MINUTES: z.coerce.number().int().min(0).max(60).default(10),
+    /** Reçus fiscaux : taux de la réduction d'impôt (66 % en France, article 200 du CGI). */
+    TAX_REDUCTION_RATE: z.coerce.number().min(0).max(1).default(0.66),
+    /** Mentions de l'association sur ses reçus. Adresse : lignes séparées par « \n ». */
+    ASSOCIATION_NAME: z.string().trim().min(1).default("Association LRT"),
+    ASSOCIATION_ADDRESS: z
+      .string()
+      .default("")
+      .transform((value) => value.replaceAll("\\n", "\n")),
+    ASSOCIATION_OBJECT: z.string().default("Soutien à la scolarité d'enfants au Togo"),
+    ASSOCIATION_SIGNATORY: z.string().trim().min(1).default("Le trésorier de l'association"),
     /** Tâches planifiées (publication programmée, purge des fichiers) : « false » pour les couper. */
     SCHEDULER_ENABLED: z.stringbool().default(true),
     /** Horloge figée (démo, e2e) : « 2026-10-31T10:00:00Z ». Vide : heure réelle. */

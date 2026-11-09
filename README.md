@@ -54,6 +54,7 @@ npm run dev        # API (port 4000) et web (port 3000)
 | `npm run test:e2e -w @parrainage/web` | tests Playwright du web : authentification et rôles, espace parrain, débordement horizontal (360 → 1440 px) et accessibilité (axe). **Remet à zéro la base de développement** (voir ci-dessous) |
 | `npm run format` | formatage (Prettier) |
 | `npm run db:migrate` / `db:seed` / `db:reset` / `db:studio` | base de données (Prisma) |
+| `npm run simulate:payments` | un passage de la banque simulée : mensualités manquantes jusqu'au mois en cours, encaissement de celles dont le jour est venu (horloge `APP_NOW` si définie) |
 
 ## Comptes de démonstration
 
@@ -144,6 +145,18 @@ Le relais publie des créneaux (`/relais/appels`, heure de Lomé). Le parrain en
 - **`VISIO_PROVIDER=jaas`** : salle 8x8.vc intégrée à la page. Il faut un compte JaaS (https://jaas.8x8.vc), son App ID, l'identifiant et la clé privée de la clé API (`JAAS_APP_ID`, `JAAS_API_KEY_ID`, `JAAS_PRIVATE_KEY`). Le jeton RS256 est limité à la salle et à la fenêtre de l'appel, seul le relais est modérateur, et l'enregistrement, la diffusion, la transcription et les appels sortants sont coupés. Dans la salle, seuls micro, caméra, mosaïque et raccrocher restent. Si la salle ne s'affiche pas en 10 secondes, la page propose de l'ouvrir dans un onglet ou de réessayer.
 
 Dans la démonstration : créneaux des 14, 18 et 21 novembre, la demande de Claire pour Aïcha (le 14, à confirmer par M. Koffi), l'appel confirmé avec Kofi le 5 novembre, et deux appels passés.
+
+## Versements et reçus fiscaux
+
+Les versements sont **simulés** : aucune coordonnée bancaire n'est demandée ni gardée. P-Versements (`/parrain/versements`) montre la mensualité, le versé de l'année, la réduction d'impôt estimée (`TAX_REDUCTION_RATE`, 66 %), l'historique par année (`?annee=`) et les reçus fiscaux. Un parrain ne voit que ses propres versements, jamais ceux d'un co-parrain.
+
+- **Mensualité** (`POST /api/parrain/payments/monthly-amount`) : par filleul, de 10 à 500 €, à partir du prochain prélèvement (celui déjà programmé change aussi). Le changement est enregistré (`MonthlyAmountChange`), audité, et le parrain reçoit un e-mail de confirmation (un lien, sans montant ni prénom).
+- **Moyen de paiement** (`PUT /api/parrain/payments/method`) : prélèvement ou carte, jour du prélèvement de 1 à 28. Audité.
+- **Don ponctuel** (`POST /api/parrain/payments/donations`) : de 5 à 1 000 €, par carte, reçu aussitôt. Plusieurs dons le même jour sont possibles ; une clé d'idempotence évite les doublons d'un double envoi.
+- **Banque simulée** : `npm run simulate:payments` crée les mensualités manquantes jusqu'au mois en cours et encaisse celles dont le jour est venu. Le relancer ne crée aucun doublon (`periodKey` unique par binôme). Volontairement manuel : une tâche planifiée à l'heure réelle écrirait dans la base des tests, dont l'horloge est figée.
+- **Reçus fiscaux** (`GET /api/parrain/receipts/:année`) : un PDF récapitulatif par année close, émis au premier téléchargement. Le numéro (« 2025-00012 », rang dans l'année) est attribué en transaction, avec un nouvel essai si deux émissions se croisent. Montant, montant en toutes lettres, identité et adresse du donateur sont figés à l'émission : le même reçu se retélécharge à l'identique. Chaque téléchargement est audité. Mentions de l'association : `ASSOCIATION_NAME`, `ASSOCIATION_ADDRESS`, `ASSOCIATION_OBJECT`, `ASSOCIATION_SIGNATORY`. Le pied de page indique un exemplaire de démonstration, les versements étant simulés.
+
+Dans la démonstration : 25 € par mois et par binôme, prélevés le 5 depuis janvier 2024 ; Claire verse 540 € en 2026 pour Aïcha et Kofi (dont un don de rentrée de 40 €) ; ses reçus 2024 (300 €) et 2025 (400 €) sont déjà émis ; l'homonyme de Sophie L. a deux mensualités en retard.
 
 ## Modération
 

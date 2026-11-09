@@ -205,6 +205,19 @@ export function callSlotsProposedEmail(url: string): MailContent {
 }
 
 /** Appel confirmé : le fichier agenda est joint, sans nom ni donnée de l'enfant. */
+export function monthlyAmountChangedEmail(url: string): MailContent {
+  return linkEmail({
+    subject: "Votre mensualité a été modifiée",
+    intro:
+      "La mensualité d'un de vos parrainages a été modifiée. Le nouveau montant s'applique dès le prochain prélèvement.",
+    action: "Voir mes versements",
+    url,
+    notes: [
+      "Si vous n'êtes pas à l'origine de ce changement, prévenez l'association sans attendre.",
+    ],
+  });
+}
+
 export function callConfirmedEmail(url: string): MailContent {
   return linkEmail({
     subject: "Appel vidéo confirmé",

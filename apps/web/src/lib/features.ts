@@ -10,7 +10,7 @@ export const features: Readonly<Record<Feature, boolean>> = {
    * vidéo » et la réponse rapide aux demandes d'appel (RW-Messages). */
   calls: true,
   /** Phase 10 : « Télécharger mon reçu fiscal ». */
-  receipts: false,
+  receipts: true,
   /** Phase 12 : « À quoi a servi votre don ». */
   expenses: false,
   /** Phase 8 : onglet « Enfants » de RW-Messages (conversations des enfants suivis). */

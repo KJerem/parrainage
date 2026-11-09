@@ -109,11 +109,11 @@ test.describe("Espace parrain : Mes filleuls", () => {
     await expect(call).toContainText("En attente de la confirmation de M. Koffi");
     await expect(call.getByRole("link", { name: "Voir ma demande" })).toBeVisible();
 
-    // Phases suivantes (drapeaux) : aucun lien mort.
-    for (const name of ["Télécharger mon reçu fiscal"]) {
-      await expect(page.getByRole("link", { name })).toHaveCount(0);
-      await expect(page.getByRole("button", { name })).toHaveCount(0);
-    }
+    // Reçus fiscaux (phase 10) sur P-Versements ; « À quoi a servi votre don » viendra avec
+    // les justificatifs (phase 12).
+    await expect(
+      payments.getByRole("link", { name: "Télécharger mon reçu fiscal" }),
+    ).toHaveAttribute("href", "/parrain/versements#recus");
     await expect(page.getByText(/À quoi a servi votre don/)).toHaveCount(0);
 
     // Ordre : profil, appel, nouvelles, résultats, versements (empilés sous lg) ; au-delà,
@@ -238,19 +238,6 @@ test.describe("Espace parrain : Mes filleuls", () => {
     await expect(articles.filter({ hasText: "Fin des vacances" })).toBeVisible();
   });
 
-  test("les rubriques à venir ont une page d'attente", async ({ page }) => {
-    await page.goto("/parrain");
-    const nav = mainNav(page);
-    for (const name of ["Mes versements"]) {
-      await nav.getByRole("link", { name }).click();
-      await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
-      await expect(page.getByText("Cette rubrique arrive bientôt")).toBeVisible();
-      await expect(nav.getByRole("link", { name })).toHaveAttribute("aria-current", "page");
-    }
-    await page.getByRole("link", { name: "Retour à mes filleuls" }).click();
-    await expect(page).toHaveURL("/parrain");
-  });
-
   test("sans filleul, l'écran principal l'explique", async ({ browser, baseURL }, testInfo) => {
     // Sophie L. (Nantes) attend son premier binôme.
     const state = await saveSession(
@@ -266,6 +253,9 @@ test.describe("Espace parrain : Mes filleuls", () => {
     await expect(page.getByRole("navigation", { name: "Choisir un filleul" })).toHaveCount(0);
     await page.goto("/parrain/nouvelles");
     await expect(page).toHaveURL("/parrain");
+    await page.goto("/parrain/versements");
+    await expect(page.getByText("Aucun versement pour l'instant")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Modifier ma mensualité" })).toHaveCount(0);
     await context.close();
   });
 });

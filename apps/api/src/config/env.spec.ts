@@ -74,6 +74,20 @@ describe("validateEnv", () => {
     ).toBe("jaas");
   });
 
+  it("prépare les reçus fiscaux : taux de 66 % et adresse sur plusieurs lignes", () => {
+    const dev = { ...base, BETTER_AUTH_SECRET: exampleSecret };
+    expect(validateEnv(dev)).toMatchObject({
+      TAX_REDUCTION_RATE: 0.66,
+      ASSOCIATION_NAME: "Association LRT",
+      ASSOCIATION_ADDRESS: "",
+    });
+    expect(
+      validateEnv({ ...dev, ASSOCIATION_ADDRESS: "4 rue de l'Exemple\\n69001 Lyon" })
+        .ASSOCIATION_ADDRESS,
+    ).toBe("4 rue de l'Exemple\n69001 Lyon");
+    expect(() => validateEnv({ ...dev, TAX_REDUCTION_RATE: "66" })).toThrow(/TAX_REDUCTION_RATE/);
+  });
+
   it("garde les tâches planifiées actives, sauf si on les coupe", () => {
     const dev = { ...base, BETTER_AUTH_SECRET: exampleSecret };
     expect(validateEnv(dev).SCHEDULER_ENABLED).toBe(true);
